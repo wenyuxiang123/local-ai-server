@@ -1,68 +1,45 @@
-name: Build Android APK
+name: Build APK
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
+    
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
+    - uses: actions/checkout@v4
+    
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-
+    
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+    
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
-
-    - name: Build APK
-      run: ./gradlew assembleDebug
-
-    - name: Upload APK artifact
+    
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon
+    
+    - name: Sign APK
+      uses: r0adkll/sign-android-release@v1
+      with:
+        releaseDirectory: app/build/outputs/apk/release
+        signingKeyBase64: ${{ secrets.SIGNING_KEY_BASE64 }}
+        alias: androiddebugkey
+        keyStorePassword: android
+        keyPassword: android
+      env:
+        BUILD_TOOLS_VERSION: "34.0.0"
+    
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: local-ai-server-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v3.3.0
-        name: Local AI Server v3.3.0 - 首次启动下载模型
-        draft: false
-        prerelease: false
-        files: app/build/outputs/apk/debug/app-debug.apk
-        body: |
-          ## Local AI Server v3.3.0
-          
-          ### 功能
-          - 首次启动自动下载Qwen3-1.7B模型（约1.1GB）
-          - 显示下载进度百分比和速度
-          - 启动/停止本地AI服务
-          - HTTP API接口供外部调用
-          
-          ### 使用说明
-          1. 安装APK（约10MB）
-          2. 打开应用，首次启动会自动下载模型
-          3. 等待下载完成（显示进度）
-          4. 启动服务即可使用
-          
-          ### 设备要求
-          - Android 7.0 (API 24) 及以上
-          - 推荐4GB以上内存
-          - 需要网络连接下载模型
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: LocalAI-Server-APK
+        path: app/build/outputs/apk/release/*.apk

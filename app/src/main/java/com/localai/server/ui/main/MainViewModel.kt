@@ -8,6 +8,8 @@ import com.localai.server.domain.model.ModelConfig
 import com.localai.server.domain.repository.AIRepository
 import com.localai.server.domain.repository.DownloadProgress
 import com.localai.server.service.AIService
+import com.localai.server.util.ExtractProgress
+import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +22,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val repository: AIRepository
+    private val repository: AIRepositoryImpl,
+    private val modelExtractor: ModelExtractor
 ) : ViewModel() {
     
     // UI状态
@@ -34,46 +37,85 @@ class MainViewModel @Inject constructor(
     init {
         checkServiceStatus()
         loadAvailableModels()
-        checkAndDownloadModel()
+        checkAndExtractModel()
     }
     
     /**
-     * 检查并下载内置模型
+     * 检查模型状态并自动启动服务
      */
-    private fun checkAndDownloadModel() {
+    private fun autoStartIfModelReady() {
         viewModelScope.launch {
             if (repository.isBuiltInModelReady()) {
                 _state.update { it.copy(modelReady = true) }
+                // 模型已就绪，自动启动服务
+                startService()
+            }
+        }
+    }
+    
+    /**
+     * 检查并下载/加载模型（三阶段流程）
+     */
+    private fun checkAndExtractModel() {
+        viewModelScope.launch {
+            if (repository.isBuiltInModelReady()) {
+                _state.update { it.copy(modelReady = true) }
+                startService()
                 return@launch
             }
             
-            // 显示下载进度卡片
-            _state.update { it.copy(isDownloadingModel = true, downloadStatus = "准备下载模型...") }
+            // 阶段1：下载
+            _state.update { 
+                it.copy(
+                    loadingPhase = LoadingPhase.DOWNLOADING,
+                    progress = 0,
+                    logMessages = "准备下载模型..."
+                )
+            }
             
-            val url = "https://modelscope.cn/api/v1/models/unsloth/Qwen3-1.7B-GGUF/resolve/master/Qwen3-1.7B-Q4_K_M.gguf"
-            
-            repository.downloadModel(url) { progress ->
-                _state.update { 
-                    it.copy(
-                        downloadPercent = progress.percent,
-                        downloadSpeed = progress.speed,
-                        downloadStatus = "正在下载模型..."
+            repository.extractBuiltInModel().collect { progress ->
+                // 根据进度百分比判断阶段
+                val phase = when {
+                    progress.percent < 98 -> LoadingPhase.DOWNLOADING
+                    progress.percent == 98 -> LoadingPhase.WAITING
+                    progress.percent >= 99 -> LoadingPhase.LOADING
+                    else -> LoadingPhase.WAITING
+                }
+                
+                _state.update { state ->
+                    // 限制日志行数，只保留最近50行
+                    val newLog = (state.logMessages + "\n> " + progress.message)
+                        .split("\n")
+                        .takeLast(50)
+                        .joinToString("\n")
+                    
+                    state.copy(
+                        loadingPhase = phase,
+                        progress = progress.percent,
+                        logMessages = newLog,
+                        downloadedBytes = progress.downloadedBytes,
+                        totalBytes = progress.totalBytes,
+                        downloadSpeed = progress.speedBytesPerSec
                     )
                 }
-            }.onSuccess {
+            }
+            
+            // 检查结果
+            if (repository.isBuiltInModelReady()) {
                 _state.update { it.copy(
-                    isDownloadingModel = false,
-                    modelReady = true,
-                    downloadStatus = "模型下载完成"
+                    loadingPhase = LoadingPhase.IDLE,
+                    modelReady = true
                 )}
-                _effect.emit(MainEffect.ShowToast("模型下载完成"))
+                _effect.emit(MainEffect.ShowToast("模型准备完成"))
+                _effect.emit(MainEffect.ExtractComplete)
                 loadAvailableModels()
-            }.onFailure { e ->
+                startService()
+            } else {
                 _state.update { it.copy(
-                    isDownloadingModel = false,
-                    downloadStatus = "下载失败: ${e.message}"
+                    loadingPhase = LoadingPhase.IDLE,
+                    error = "模型加载失败"
                 )}
-                _effect.emit(MainEffect.ShowError("模型下载失败: ${e.message}"))
+                _effect.emit(MainEffect.ShowError("模型加载失败，请检查网络连接"))
             }
         }
     }
@@ -110,6 +152,15 @@ class MainViewModel @Inject constructor(
                 _state.update { it.copy(statusMessage = message) }
             }
         }
+        
+        // 监听错误信息
+        viewModelScope.launch {
+            AIService.errorMessage.collect { errorMsg ->
+                if (errorMsg != null) {
+                    _state.update { it.copy(error = errorMsg, isLoading = false) }
+                }
+            }
+        }
     }
     
     private fun loadAvailableModels() {
@@ -133,13 +184,17 @@ class MainViewModel @Inject constructor(
                 )
             }
             
-            // 自动加载已下载的模型
+            // 自动加载内置模型
             if (repository.isBuiltInModelReady()) {
-                val models = repository.getAvailableModels()
-                val builtInModel = models.find { it.name.contains("qwen3", ignoreCase = true) }
-                if (builtInModel != null) {
-                    loadModel(builtInModel.path)
+                val modelPath = repository.getBuiltInModelPath()
+                if (modelPath != null) {
+                    loadModel(modelPath)
+                } else {
+                    _state.update { it.copy(isLoading = false) }
+                    _effect.emit(MainEffect.ShowError("模型路径获取失败"))
                 }
+            } else {
+                _state.update { it.copy(isLoading = false) }
             }
             
             _effect.emit(MainEffect.ShowToast("服务已启动: $address"))
@@ -239,6 +294,16 @@ class MainViewModel @Inject constructor(
 }
 
 /**
+ * 模型加载阶段
+ */
+enum class LoadingPhase {
+    IDLE,           // 空闲
+    DOWNLOADING,    // 下载中
+    WAITING,        // 等待加载模型
+    LOADING         // 加载中
+}
+
+/**
  * UI状态
  */
 data class MainState(
@@ -251,13 +316,16 @@ data class MainState(
     val modelConfig: ModelConfig? = null,
     val availableModels: List<ModelConfig> = emptyList(),
     val selectedModelPath: String = "",
+    // 三个阶段的进度状态
+    val loadingPhase: LoadingPhase = LoadingPhase.IDLE,
+    val progress: Int = 0,
+    val logMessages: String = "",
+    // 下载专用
     val isDownloading: Boolean = false,
     val downloadProgress: Int = 0,
-    // 新增：模型下载状态
-    val isDownloadingModel: Boolean = false,
-    val downloadPercent: Int = 0,
+    val downloadedBytes: Long = 0,
+    val totalBytes: Long = 0,
     val downloadSpeed: Long = 0,
-    val downloadStatus: String = "",
     val error: String? = null
 )
 
@@ -279,4 +347,5 @@ sealed class MainIntent {
 sealed class MainEffect {
     data class ShowToast(val message: String) : MainEffect()
     data class ShowError(val message: String) : MainEffect()
+    object ExtractComplete : MainEffect()
 }

@@ -10,6 +10,7 @@ import com.localai.server.data.repository.ChatRepository
 import com.localai.server.data.repository.ChatRepositoryImpl
 import com.localai.server.domain.repository.AIRepository
 import com.localai.server.engine.LlamaEngine
+import com.localai.server.util.ModelExtractor
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -59,9 +60,10 @@ object RepositoryModule {
     @Singleton
     fun provideAIRepository(
         context: Context,
-        engine: LlamaEngine
+        engine: LlamaEngine,
+        modelExtractor: ModelExtractor
     ): AIRepository {
-        return AIRepositoryImpl(context, engine)
+        return AIRepositoryImpl(context, engine, modelExtractor)
     }
 }
 

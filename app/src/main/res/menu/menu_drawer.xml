@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <group android:checkableBehavior="none">
+        <item
+            android:id="@+id/menu_schedule"
+            android:icon="@android:drawable/ic_menu_my_calendar"
+            android:title="@string/menu_schedule" />
+        <item
+            android:id="@+id/menu_files"
+            android:icon="@android:drawable/ic_menu_agenda"
+            android:title="@string/menu_files" />
+        <item
+            android:id="@+id/menu_email"
+            android:icon="@android:drawable/ic_dialog_email"
+            android:title="@string/menu_email" />
+        <item
+            android:id="@+id/menu_device"
+            android:icon="@android:drawable/ic_menu_manage"
+            android:title="@string/menu_device" />
+        <item
+            android:id="@+id/menu_channels"
+            android:icon="@android:drawable/ic_menu_share"
+            android:title="@string/menu_channels" />
+    </group>
+    
+    <item android:title="高级">
+        <menu>
+            <item
+                android:id="@+id/menu_skills"
+                android:icon="@android:drawable/ic_menu_compass"
+                android:title="@string/menu_skills" />
+            <item
+                android:id="@+id/menu_agent_world"
+                android:icon="@android:drawable/ic_menu_mapmode"
+                android:title="@string/menu_agent_world" />
+        </menu>
+    </item>
+    
+</menu>

@@ -140,13 +140,8 @@ class ChatViewModel @Inject constructor(
                 // Scroll to bottom
                 _effect.emit(ChatEffect.ScrollToBottom)
                 
-                // Get server address
-                val serverStatus = aiRepository.getServerStatus()
-                val baseUrl = if (serverStatus.isRunning && serverStatus.address != null) {
-                    serverStatus.address!!
-                } else {
-                    "http://localhost:8080"
-                }
+                // Always use 127.0.0.1 for internal chat (WiFi IP can cause connection issues)
+                val baseUrl = "http://127.0.0.1:8080"
                 
                 // Get history messages for context
                 val historyMessages = _messages.value.map { msg ->

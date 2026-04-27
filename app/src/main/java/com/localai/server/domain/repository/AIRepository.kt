@@ -29,6 +29,11 @@ interface AIRepository {
     fun isBuiltInModelReady(): Boolean
     
     /**
+     * 获取内置模型路径
+     */
+    fun getBuiltInModelPath(): String?
+    
+    /**
      * 从Uri复制模型文件到应用目录
      */
     suspend fun copyModelFromUri(uri: Uri): Result<File>

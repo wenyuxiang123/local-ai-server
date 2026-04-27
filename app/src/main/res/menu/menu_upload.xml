@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/menu_photo"
+        android:title="📷 照片"
+        android:icon="@android:drawable/ic_menu_gallery" />
+    <item
+        android:id="@+id/menu_video"
+        android:title="🎬 视频"
+        android:icon="@android:drawable/ic_menu_camera" />
+    <item
+        android:id="@+id/menu_document"
+        android:title="📄 文档"
+        android:icon="@drawable/ic_document" />
+    <item
+        android:id="@+id/menu_file"
+        android:title="📁 其他文件"
+        android:icon="@android:drawable/ic_menu_more" />
+</menu>

@@ -1,4 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Local AI Server</string>
+    <string name="app_name">扣子</string>
+    
+    <!-- 主界面 -->
+    <string name="tab_home">主页</string>
+    <string name="tab_optimizer">优化</string>
+    <string name="tab_compile">编译</string>
+    
+    <!-- 聊天 -->
+    <string name="chat_hint">发送消息或长按说话开始任务</string>
+    <string name="btn_send">发送</string>
+    <string name="btn_new_chat">新建会话</string>
+    <string name="ai_content_notice">内容由AI生成</string>
+    <string name="new_message">新消息</string>
+    
+    <!-- 侧边栏 -->
+    <string name="drawer_open">打开菜单</string>
+    <string name="drawer_close">关闭菜单</string>
+    <string name="status_idle">空闲中</string>
+    <string name="status_online">在线</string>
+    
+    <!-- 侧边栏菜单项 -->
+    <string name="menu_schedule">日程</string>
+    <string name="menu_files">文件</string>
+    <string name="menu_email">邮箱</string>
+    <string name="menu_device">设备</string>
+    <string name="menu_channels">渠道</string>
+    <string name="menu_skills">技能</string>
+    <string name="menu_agent_world">Agent World</string>
+    <string name="menu_new_topic">创建新话题</string>
+    <string name="menu_history">查看历史话题</string>
+    
+    <!-- 服务状态 -->
+    <string name="service_not_started">服务未启动</string>
+    <string name="service_running">服务运行中</string>
+    <string name="service_starting">正在启动…</string>
+    
+    <!-- 功能 -->
+    <string name="web_search">联网搜索</string>
+    <string name="upload_file">上传文件</string>
+    <string name="attachment_image">图片</string>
+    <string name="attachment_video">视频</string>
+    <string name="attachment_document">文档</string>
+    <string name="attachment_file">其他文件</string>
 </resources>

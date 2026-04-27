@@ -1,33 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary colors -->
-    <color name="primary">#2196F3</color>
-    <color name="primary_dark">#1976D2</color>
+    <!-- Primary colors - 扣子风格 -->
+    <color name="primary">#1976D2</color>
+    <color name="primary_dark">#1565C0</color>
     <color name="primary_light">#BBDEFB</color>
+    <color name="primary_variant">#1E88E5</color>
+    <color name="accent">#2196F3</color>
     <color name="teal_200">#80CBC4</color>
     <color name="teal_700">#00796B</color>
     
     <!-- Status colors -->
     <color name="status_running">#4CAF50</color>
     <color name="status_stopped">#F44336</color>
+    <color name="status_color">#757575</color>
+    <color name="status_online">#4CAF50</color>
     
     <!-- Chat colors -->
-    <color name="background_chat">#F5F5F5</color>
+    <color name="background_chat">#FFFFFF</color>
     <color name="surface_chat">#FFFFFF</color>
-    <color name="surface_drawer">#FFFFFF</color>
+    
+    <!-- Drawer - 扣子风格浅米白 -->
+    <color name="surface_drawer">#F5F3EF</color>
+    <color name="drawer_header_bg">#F5F3EF</color>
+    <color name="drawer_item_text">#212121</color>
+    <color name="drawer_item_icon">#757575</color>
     
     <!-- Input colors -->
     <color name="input_background">#FFFFFF</color>
     <color name="input_stroke">#E0E0E0</color>
+    <color name="input_hint">#9E9E9E</color>
     
     <!-- Text colors -->
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
     <color name="text_hint">#9E9E9E</color>
+    <color name="text_on_primary">#FFFFFF</color>
     
-    <!-- Message bubble colors -->
+    <!-- Message bubble colors - 扣子风格 -->
     <color name="message_user_bg">#2196F3</color>
     <color name="message_user_text">#FFFFFF</color>
-    <color name="message_assistant_bg">#FFFFFF</color>
+    <color name="message_assistant_bg">#E3F2FD</color>
     <color name="message_assistant_text">#212121</color>
+    
+    <!-- Divider -->
+    <color name="divider">#E0E0E0</color>
+    <color name="divider_light">#EEEEEE</color>
+    
+    <!-- Card and elevation -->
+    <color name="card_background">#FFFFFF</color>
+    <color name="card_elevated">#FAFAFA</color>
+    
+    <!-- Toolbar -->
+    <color name="toolbar_bg">#FFFFFF</color>
+    <color name="toolbar_text">#212121</color>
+    
+    <!-- Bottom navigation -->
+    <color name="bottom_nav_bg">#FFFFFF</color>
+    <color name="bottom_nav_selected">#1976D2</color>
+    <color name="bottom_nav_unselected">#757575</color>
 </resources>

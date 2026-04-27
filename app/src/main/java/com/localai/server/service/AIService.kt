@@ -1,6 +1,5 @@
 package com.localai.server.service
 
-import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -9,11 +8,13 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.localai.server.App
 import com.localai.server.MainActivity
 import com.localai.server.R
 import com.localai.server.engine.LlamaEngine
+import com.localai.server.server.AiHttpServer
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,9 @@ import javax.inject.Inject
 class AIService : Service() {
 
     companion object {
+        private const val TAG = "AIService"
         const val NOTIFICATION_ID = 1001
+        const val SERVER_PORT = 8080
         
         const val ACTION_START = "com.localai.server.action.START"
         const val ACTION_STOP = "com.localai.server.action.STOP"
@@ -48,6 +51,9 @@ class AIService : Service() {
         
         private val _statusMessage = MutableStateFlow("")
         val statusMessage: StateFlow<String> = _statusMessage
+        
+        private val _errorMessage = MutableStateFlow<String?>(null)
+        val errorMessage: StateFlow<String?> = _errorMessage
         
         fun start(context: Context) {
             val intent = Intent(context, AIService::class.java).apply {
@@ -76,6 +82,10 @@ class AIService : Service() {
             }
             context.startService(intent)
         }
+        
+        fun updateModelLoaded(loaded: Boolean) {
+            _modelLoaded.value = loaded
+        }
     }
     
     @Inject
@@ -84,6 +94,7 @@ class AIService : Service() {
     private val binder = LocalBinder()
     private lateinit var notificationBuilder: NotificationCompat.Builder
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var httpServer: AiHttpServer? = null
     
     inner class LocalBinder : Binder() {
         fun getService(): AIService = this@AIService
@@ -104,6 +115,8 @@ class AIService : Service() {
             ACTION_START -> {
                 _isRunning.value = true
                 _statusMessage.value = "服务已启动"
+                _errorMessage.value = null
+                startHttpServer()
                 updateNotification("服务运行中")
             }
             ACTION_STOP -> {
@@ -147,9 +160,33 @@ class AIService : Service() {
         _statusMessage.value = text
     }
     
+    private fun startHttpServer() {
+        try {
+            if (httpServer == null) {
+                httpServer = AiHttpServer(engine, SERVER_PORT)
+                httpServer?.start(30000, false)  // 30s socket timeout, non-daemon thread
+                Log.i(TAG, "HTTP Server started on port $SERVER_PORT (non-daemon)")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start HTTP server", e)
+            _errorMessage.value = "HTTP服务启动失败: ${e.message}"
+        }
+    }
+    
+    private fun stopHttpServer() {
+        try {
+            httpServer?.stop()
+            httpServer = null
+            Log.i(TAG, "HTTP Server stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping HTTP server", e)
+        }
+    }
+    
     private fun loadModelInternal(path: String, nCtx: Int, nThreads: Int) {
         serviceScope.launch {
             updateNotification("正在加载模型...")
+            _errorMessage.value = null
             
             val success = withContext(Dispatchers.Default) {
                 engine.loadModel(path, nCtx, nThreads)
@@ -158,17 +195,24 @@ class AIService : Service() {
             if (success) {
                 _modelLoaded.value = true
                 updateNotification("模型已加载，服务就绪")
+                Log.i(TAG, "Model loaded successfully: $path")
             } else {
+                val error = LlamaEngine.getLoadError() ?: "未知错误"
+                _modelLoaded.value = false
+                _errorMessage.value = "模型加载失败: $error"
                 updateNotification("模型加载失败")
+                Log.e(TAG, "Failed to load model: $path, error: $error")
             }
         }
     }
     
     private fun stopService() {
         serviceScope.launch {
+            stopHttpServer()
             engine.unloadModel()
             _modelLoaded.value = false
             _isRunning.value = false
+            _errorMessage.value = null
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -178,6 +222,7 @@ class AIService : Service() {
     }
     
     override fun onDestroy() {
+        stopHttpServer()
         engine.unloadModel()
         _modelLoaded.value = false
         _isRunning.value = false

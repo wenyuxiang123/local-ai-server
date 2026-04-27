@@ -12,26 +12,43 @@ android {
 
     defaultConfig {
         applicationId "com.localai.server"
-        minSdk 30
+        minSdk 33
         targetSdk 35
         versionCode 4
-        versionName "3.2-llama"
+        versionName "3.2-llama-official"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
         }
+        
+        ndk {
+            abiFilters += ['arm64-v8a']
+        }
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('/root/.android/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled false
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
             debuggable true
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+            crunchPngs false
         }
     }
     
@@ -47,13 +64,44 @@ android {
     buildFeatures {
         viewBinding true
     }
+    
+    // 完全禁用资源压缩
+    aaptOptions {
+        noCompress 'gguf', 'bin', 'dat', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'part', 'split'
+        cruncherEnabled = false
+    }
+    
+    androidResources {
+        noCompress 'gguf', 'bin', 'dat', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'part', 'split'
+    }
+    
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*']
+        }
+    }
+}
+
+// 完全禁用compressAssets任务
+afterEvaluate {
+    tasks.matching { task ->
+        task.name.contains("compressAssets") || task.name.contains("CompressAssets")
+    }.configureEach {
+        enabled = false
+    }
+    
+    // 强制禁用所有压缩相关任务
+    tasks.withType(com.android.build.gradle.internal.tasks.CompressAssetsTask).configureEach {
+        enabled = false
+    }
 }
 
 dependencies {
-    // llama-kotlin-android - 直接加载本地 GGUF 文件
-    implementation('org.codeshipping:llama-kotlin-android:0.1.0') {
-        exclude group: 'androidx.core', module: 'core-ktx'
-    }
+    // llama.cpp 官方 Android 绑定 - 包含完整的 native 库
+    implementation project(':llama-lib')
     
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
@@ -83,6 +131,7 @@ dependencies {
     
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
     implementation 'androidx.datastore:datastore-preferences:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     

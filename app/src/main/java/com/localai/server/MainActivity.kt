@@ -12,10 +12,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.view.isVisible
+import androidx.core.view.GravityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.navigation.NavigationView
+import com.google.android.material.tabs.TabLayoutMediator
 import com.localai.server.databinding.ActivityMainBinding
 import com.localai.server.domain.model.AVAILABLE_MODELS
 import com.localai.server.engine.LlamaEngine
@@ -24,11 +26,12 @@ import com.localai.server.ui.main.MainEffect
 import com.localai.server.ui.main.MainIntent
 import com.localai.server.ui.main.MainState
 import com.localai.server.ui.main.MainViewModel
+import com.localai.server.ui.tabs.MainPagerAdapter
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
 
     companion object {
         private const val TAG = "MainActivity"
@@ -53,7 +56,6 @@ class MainActivity : AppCompatActivity() {
         uri?.let {
             selectedModelUri = it
             val fileName = it.lastPathSegment?.substringAfterLast("/") ?: "选中文件"
-            binding.tvSelectedModel.text = fileName
             showToast("已选择: $fileName")
         }
     }
@@ -67,9 +69,43 @@ class MainActivity : AppCompatActivity() {
         checkNativeLibraries()
         
         checkPermissions()
-        setupViews()
+        setupToolbar()
+        setupDrawer()
+        setupTabs()
         observeState()
         observeEffects()
+    }
+    
+    private fun setupToolbar() {
+        binding.toolbar.setNavigationOnClickListener {
+            binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+    }
+    
+    private fun setupDrawer() {
+        binding.navView.setNavigationItemSelectedListener(this)
+    }
+    
+    override fun onNavigationItemSelected(item: android.view.MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.menu_schedule -> showToast("日程功能开发中")
+            R.id.menu_files -> showToast("文件功能开发中")
+            R.id.menu_email -> showToast("邮箱功能开发中")
+            R.id.menu_device -> showToast("设备功能开发中")
+            R.id.menu_channels -> showToast("渠道功能开发中")
+            R.id.menu_skills -> showToast("技能功能开发中")
+            R.id.menu_agent_world -> showToast("Agent World功能开发中")
+        }
+        binding.drawerLayout.closeDrawer(GravityCompat.START)
+        return true
+    }
+    
+    override fun onBackPressed() {
+        if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            binding.drawerLayout.closeDrawer(GravityCompat.START)
+        } else {
+            super.onBackPressed()
+        }
     }
     
     private fun checkNativeLibraries() {
@@ -103,55 +139,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun setupViews() {
-        // 服务控制
-        binding.btnStart.setOnClickListener {
-            viewModel.onIntent(MainIntent.StartService)
-        }
+    private fun setupTabs() {
+        // 设置 ViewPager
+        val adapter = MainPagerAdapter(this)
+        binding.viewPager.adapter = adapter
         
-        binding.btnStop.setOnClickListener {
-            viewModel.onIntent(MainIntent.StopService)
-        }
-        
-        // 模型选择
-        val modelNames = AVAILABLE_MODELS.map { "${it.name} (${it.size})" }
-        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, modelNames)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.spinnerModels.adapter = adapter
-        
-        binding.btnDownload.setOnClickListener {
-            val index = binding.spinnerModels.selectedItemPosition
-            if (index in AVAILABLE_MODELS.indices) {
-                val model = AVAILABLE_MODELS[index]
-                viewModel.onIntent(MainIntent.DownloadModel(model.url, model.name))
+        // 连接 TabLayout 和 ViewPager
+        TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
+            tab.text = when (position) {
+                0 -> "主页"
+                1 -> "优化"
+                2 -> "编译"
+                else -> ""
             }
-        }
-        
-        // 加载模型
-        binding.btnSelectModel.setOnClickListener {
-            selectModelLauncher.launch(arrayOf("*/*"))
-        }
-        
-        binding.btnLoadModel.setOnClickListener {
-            val uri = selectedModelUri
-            if (uri != null) {
-                viewModel.onIntent(MainIntent.LoadModel(uri.toString()))
-            } else {
-                showToast("请先选择模型文件")
-            }
-        }
-        
-        // 聊天按钮
-        binding.btnChat.setOnClickListener {
-            startActivity(Intent(this, ChatActivity::class.java))
-        }
+        }.attach()
     }
     
     private fun observeState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.state.collect { state ->
-                    updateUI(state)
+                    // 状态更新会在各个 Fragment 中处理
                 }
             }
         }
@@ -164,79 +172,10 @@ class MainActivity : AppCompatActivity() {
                     when (effect) {
                         is MainEffect.ShowToast -> showToast(effect.message)
                         is MainEffect.ShowError -> showError(effect.message)
+                        is MainEffect.ExtractComplete -> { /* handled in fragment */ }
                     }
                 }
             }
-        }
-    }
-    
-    private fun updateUI(state: MainState) {
-        binding.apply {
-            // 模型下载进度
-            cardDownloadProgress.isVisible = state.isDownloadingModel || state.downloadStatus.isNotEmpty()
-            if (state.isDownloadingModel) {
-                tvDownloadStatus.text = state.downloadStatus
-                progressDownload.progress = state.downloadPercent
-                tvDownloadPercent.text = "${state.downloadPercent}%"
-                tvDownloadSpeed.text = formatSpeed(state.downloadSpeed)
-            } else if (state.modelReady) {
-                cardDownloadProgress.isVisible = false
-            }
-            
-            // 服务状态
-            tvStatus.text = when {
-                state.serviceRunning && state.modelLoaded -> "运行中"
-                state.serviceRunning -> "服务启动，等待加载模型"
-                else -> "已停止"
-            }
-            
-            tvStatus.setBackgroundResource(
-                if (state.serviceRunning && state.modelLoaded) 
-                    R.color.status_running 
-                else 
-                    R.color.status_stopped
-            )
-            
-            // 服务器地址
-            tvAddress.text = if (state.serverAddress.isNotEmpty()) {
-                "API地址: ${state.serverAddress}"
-            } else {
-                "API地址: --"
-            }
-            
-            // 模型状态
-            tvModelStatus.text = when {
-                state.modelReady -> "模型: Qwen3-1.7B 已就绪"
-                state.modelLoaded -> "模型: ${state.modelConfig?.name ?: "已加载"}"
-                else -> "模型: 未加载"
-            }
-            
-            // 按钮状态
-            btnStart.isEnabled = !state.serviceRunning && state.modelReady
-            btnStop.isEnabled = state.serviceRunning
-            btnLoadModel.isVisible = false // 隐藏手动加载按钮
-            btnSelectModel.isVisible = false // 隐藏选择文件按钮
-            
-            // 聊天按钮 - 只在服务运行时可用
-            btnChat.isEnabled = state.serviceRunning && state.modelLoaded
-            
-            // 进度
-            progressBar.isVisible = state.isLoading || state.isDownloading
-            if (state.isDownloading) {
-                progressBar.progress = state.downloadProgress
-            }
-            
-            // 错误信息
-            tvError.isVisible = state.error != null
-            tvError.text = state.error
-        }
-    }
-    
-    private fun formatSpeed(bytesPerSecond: Long): String {
-        return when {
-            bytesPerSecond >= 1024 * 1024 -> String.format("%.1f MB/s", bytesPerSecond / (1024.0 * 1024.0))
-            bytesPerSecond >= 1024 -> String.format("%.1f KB/s", bytesPerSecond / 1024.0)
-            else -> "$bytesPerSecond B/s"
         }
     }
     

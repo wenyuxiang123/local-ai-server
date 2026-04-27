@@ -9,8 +9,10 @@ import com.localai.server.domain.repository.AIRepository
 import com.localai.server.domain.repository.DownloadProgress
 import com.localai.server.engine.LlamaEngine
 import com.localai.server.service.AIService
+import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -22,22 +24,37 @@ import javax.inject.Singleton
 @Singleton
 class AIRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val engine: LlamaEngine
+    private val engine: LlamaEngine,
+    private val modelExtractor: ModelExtractor
 ) : AIRepository {
     
     companion object {
         private const val TAG = "AIRepositoryImpl"
-        private const val BUILT_IN_MODEL_URL = "https://modelscope.cn/api/v1/models/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/master/qwen2.5-3b-instruct-q4_k_m.gguf"
     }
     
     private val modelDir: File by lazy {
         File(context.filesDir, "models").apply { mkdirs() }
     }
     
-    private val builtInModelName = "qwen2.5-3b-instruct-q4_k_m.gguf"
+    // 内置模型文件名 - DeepSeek-R1-Distill-Qwen-14B
+    private val builtInModelName = modelExtractor.getModelFileName()
     
     override fun isBuiltInModelReady(): Boolean {
-        return File(modelDir, builtInModelName).exists()
+        // 使用 ModelExtractor 检查模型是否已解压
+        return modelExtractor.isModelExtracted()
+    }
+    
+    override fun getBuiltInModelPath(): String? {
+        // 使用 ModelExtractor 获取模型路径
+        return modelExtractor.getModelPath()
+    }
+    
+    /**
+     * 解压内置模型
+     * @return Flow<ExtractProgress> 解压进度
+     */
+    suspend fun extractBuiltInModel(): Flow<com.localai.server.util.ExtractProgress> {
+        return modelExtractor.extractModel()
     }
     
     private val client = OkHttpClient.Builder()
@@ -147,13 +164,16 @@ class AIRepositoryImpl @Inject constructor(
                 return@withContext Result.failure(Exception("模型文件不存在"))
             }
             
-            // 计算最优线程数
+            // 计算最优线程数 - 14B 模型需要更多内存，降低线程数
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
             
-            // 加载模型
+            // 加载模型 - 14B 模型建议使用更大的上下文
             val success = engine.loadModel(path, 2048, threads)
             
             if (success) {
+                // 更新 AIService 的模型加载状态
+                AIService.updateModelLoaded(true)
+                
                 val config = ModelConfig(
                     name = file.nameWithoutExtension,
                     path = path,

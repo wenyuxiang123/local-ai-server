@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.localai.server.engine.LlamaEngine
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -18,6 +19,8 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        // 初始化LlamaEngine
+        LlamaEngine.initialize(this)
     }
     
     private fun createNotificationChannel() {

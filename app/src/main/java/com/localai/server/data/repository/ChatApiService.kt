@@ -57,9 +57,10 @@ class ChatApiService @Inject constructor() {
     }
     
     private val client = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(300, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
     
     private val gson = Gson()
@@ -68,58 +69,92 @@ class ChatApiService @Inject constructor() {
         baseUrl: String = DEFAULT_BASE_URL,
         messages: List<ChatMessage>
     ): Result<String> = withContext(Dispatchers.IO) {
-        try {
-            val requestBody = ChatRequest(
-                messages = messages,
-                max_tokens = 2048,
-                temperature = 0.7f
-            )
-            
-            val json = gson.toJson(requestBody)
-            Log.d(TAG, "Request: $json")
-            
-            val request = Request.Builder()
-                .url("$baseUrl/v1/chat/completions")
-                .post(json.toRequestBody("application/json".toMediaType()))
-                .build()
-            
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string()
-                Log.d(TAG, "Response code: ${response.code}")
-                Log.d(TAG, "Response body: $body")
+        var lastException: Exception? = null
+        val maxRetries = 2
+        
+        repeat(maxRetries) { attempt ->
+            try {
+                val requestBody = ChatRequest(
+                    messages = messages,
+                    max_tokens = 2048,
+                    temperature = 0.7f
+                )
                 
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(
-                        IOException("HTTP ${response.code}: ${response.message}")
-                    )
-                }
+                val json = gson.toJson(requestBody)
+                Log.d(TAG, "Request (attempt ${attempt + 1}): $json")
                 
-                body?.let {
-                    val chatResponse = gson.fromJson(it, ChatResponse::class.java)
+                val request = Request.Builder()
+                    .url("$baseUrl/v1/chat/completions")
+                    .post(json.toRequestBody("application/json".toMediaType()))
+                    .build()
+                
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string()
+                    Log.d(TAG, "Response code: ${response.code}")
+                    Log.d(TAG, "Response body: ${body?.take(200)}")
                     
-                    // Check for API error
-                    chatResponse.error?.let { error ->
-                        return@withContext Result.failure(
-                            IOException(error.message ?: "API Error")
-                        )
+                    if (!response.isSuccessful) {
+                        // 503 means model not ready, don't retry
+                        if (response.code == 503) {
+                            return@withContext Result.failure(
+                                IOException("模型未加载，请先加载模型")
+                            )
+                        }
+                        lastException = IOException("HTTP ${response.code}: ${response.message}")
+                        if (attempt < maxRetries - 1) {
+                            Thread.sleep(2000L * (attempt + 1))
+                            return@repeat
+                        }
+                        return@withContext Result.failure(lastException!!)
                     }
                     
-                    // Extract assistant message
-                    val assistantMessage = chatResponse.choices
-                        ?.firstOrNull()
-                        ?.message
-                        ?.content
-                        ?: ""
+                    body?.let {
+                        val chatResponse = gson.fromJson(it, ChatResponse::class.java)
+                        
+                        // Check for API error
+                        chatResponse.error?.let { error ->
+                            return@withContext Result.failure(
+                                IOException(error.message ?: "API Error")
+                            )
+                        }
+                        
+                        // Extract assistant message
+                        val assistantMessage = chatResponse.choices
+                            ?.firstOrNull()
+                            ?.message
+                            ?.content
+                            ?: ""
+                        
+                        return@withContext Result.success(assistantMessage)
+                    }
                     
-                    return@withContext Result.success(assistantMessage)
+                    return@withContext Result.failure(IOException("Empty response body"))
                 }
-                
-                Result.failure(IOException("Empty response body"))
+            } catch (e: java.net.SocketException) {
+                Log.w(TAG, "Connection error (attempt ${attempt + 1}): ${e.message}")
+                lastException = e
+                if (attempt < maxRetries - 1) {
+                    Thread.sleep(2000L * (attempt + 1))
+                }
+            } catch (e: java.net.SocketTimeoutException) {
+                Log.w(TAG, "Timeout (attempt ${attempt + 1}): ${e.message}")
+                lastException = e
+                if (attempt < maxRetries - 1) {
+                    Thread.sleep(2000L * (attempt + 1))
+                }
+            } catch (e: java.io.IOException) {
+                Log.w(TAG, "IO error (attempt ${attempt + 1}): ${e.message}")
+                lastException = e
+                if (attempt < maxRetries - 1) {
+                    Thread.sleep(2000L * (attempt + 1))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending message", e)
+                return@withContext Result.failure(e)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending message", e)
-            Result.failure(e)
         }
+        
+        Result.failure(lastException ?: IOException("Unknown error after retries"))
     }
     
     // Build messages for API from database messages
@@ -131,6 +166,28 @@ class ChatApiService @Inject constructor() {
             allMessages.add(ChatMessage("system", "You are a helpful assistant."))
         }
         
+        allMessages.add(ChatMessage("user", userContent))
+        
+        return allMessages
+    }
+
+    /**
+     * Build messages with custom system prompt (for web search context)
+     */
+    fun buildMessagesWithSystemPrompt(
+        userContent: String,
+        historyMessages: List<ChatMessage>,
+        systemPrompt: String
+    ): List<ChatMessage> {
+        val allMessages = mutableListOf<ChatMessage>()
+        
+        // Add custom system prompt
+        allMessages.add(ChatMessage("system", systemPrompt))
+        
+        // Add history messages
+        allMessages.addAll(historyMessages)
+        
+        // Add user message
         allMessages.add(ChatMessage("user", userContent))
         
         return allMessages

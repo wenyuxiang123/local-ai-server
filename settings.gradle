@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "LocalAI-Server"
 include ':app'
+include ':llama-lib'
