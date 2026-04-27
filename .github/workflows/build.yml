@@ -27,19 +27,8 @@ jobs:
     - name: Build Release APK
       run: ./gradlew assembleRelease --no-daemon
     
-    - name: Sign APK
-      uses: r0adkll/sign-android-release@v1
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY_BASE64 }}
-        alias: androiddebugkey
-        keyStorePassword: android
-        keyPassword: android
-      env:
-        BUILD_TOOLS_VERSION: "34.0.0"
-    
-    - name: Upload APK
+    - name: Upload unsigned APK
       uses: actions/upload-artifact@v4
       with:
-        name: LocalAI-Server-APK
-        path: app/build/outputs/apk/release/*.apk
+        name: LocalAI-Server-unsigned-APK
+        path: app/build/outputs/apk/release/app-release-unsigned.apk
