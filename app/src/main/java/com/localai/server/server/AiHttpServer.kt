@@ -94,7 +94,11 @@ class AiHttpServer(
             }
 
             // 检查模型是否已加载
-            if (!engine.isModelLoaded()) {
+            val modelLoaded = engine.isModelLoaded()
+            val modelName = engine.getLoadedModelName()
+            Log.i(TAG, "Chat request received: modelLoaded=$modelLoaded, modelName=$modelName")
+            if (!modelLoaded) {
+                Log.w(TAG, "Model not loaded! Returning 503")
                 return errorResponse("Model not loaded", 503)
             }
 

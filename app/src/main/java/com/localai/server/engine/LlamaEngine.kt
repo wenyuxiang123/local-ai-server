@@ -206,9 +206,11 @@ class LlamaEngine @Inject constructor(
     }
     
     fun isModelLoaded(): Boolean {
-        // Directly check InferenceEngine state instead of relying on async state collection
         val engineState = engine.state.value
-        return isModelLoaded && engineState is InferenceEngine.State.ModelReady
+        Log.d(TAG, "isModelLoaded() check: localFlag=$isModelLoaded, engineState=${engineState.javaClass.simpleName}")
+        // Only check local flag; engine state check is done by sendUserPrompt internally
+        // If engine state is wrong, sendUserPrompt will throw IllegalStateException
+        return isModelLoaded
     }
     
     /**
