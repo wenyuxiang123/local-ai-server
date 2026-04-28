@@ -146,8 +146,8 @@ class LlamaEngine @Inject constructor(
             Log.i(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB")
             Log.i(TAG, "Context size: $nCtx, Threads: $nThreads")
             
-            // 使用官方 API 加载模型
-            engine.loadModel(path)
+            // 使用官方 API 加载模型，传入上下文大小
+            engine.loadModel(path, nCtx)
             
             // 如果之前有设置过 system prompt，重新设置
             if (_systemPrompt.isNotEmpty()) {
@@ -206,8 +206,8 @@ class LlamaEngine @Inject constructor(
     }
     
     fun isModelLoaded(): Boolean {
-        // Also check InferenceEngine state - if it is in Error or non-ready state, treat as not loaded
-        val engineState = _state.value
+        // Directly check InferenceEngine state instead of relying on async state collection
+        val engineState = engine.state.value
         return isModelLoaded && engineState is InferenceEngine.State.ModelReady
     }
     

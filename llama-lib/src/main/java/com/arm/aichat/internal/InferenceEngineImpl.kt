@@ -83,7 +83,7 @@ internal class InferenceEngineImpl private constructor(
     private external fun init(nativeLibDir: String)
 
     @FastNative
-    private external fun load(modelPath: String): Int
+    private external fun load(modelPath: String, nCtx: Int): Int
 
     @FastNative
     private external fun prepare(): Int
@@ -147,7 +147,7 @@ internal class InferenceEngineImpl private constructor(
     /**
      * Load the LLM
      */
-    override suspend fun loadModel(pathToModel: String) =
+    override suspend fun loadModel(pathToModel: String, nCtx: Int = 2048) =
         withContext(llamaDispatcher) {
             check(_state.value is InferenceEngine.State.Initialized) {
                 "Cannot load model in ${_state.value.javaClass.simpleName}!"
@@ -164,7 +164,7 @@ internal class InferenceEngineImpl private constructor(
                 Log.i(TAG, "Loading model... \n$pathToModel")
                 _readyForSystemPrompt = false
                 _state.value = InferenceEngine.State.LoadingModel
-                load(pathToModel).let {
+                load(pathToModel, nCtx).let {
                     // TODO-han.yin: find a better way to pass other error codes
                     if (it != 0) throw UnsupportedArchitectureException()
                 }

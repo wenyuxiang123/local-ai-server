@@ -28,7 +28,7 @@ constexpr int   N_THREADS_MIN           = 2;
 constexpr int   N_THREADS_MAX           = 4;
 constexpr int   N_THREADS_HEADROOM      = 2;
 
-constexpr int   DEFAULT_CONTEXT_SIZE    = 8192;
+constexpr int   DEFAULT_CONTEXT_SIZE    = 2048;
 constexpr int   OVERFLOW_HEADROOM       = 4;
 constexpr int   BATCH_SIZE              = 512;
 constexpr float DEFAULT_SAMPLER_TEMP    = 0.3f;
@@ -38,6 +38,7 @@ static llama_context                    * g_context;
 static llama_batch                        g_batch;
 static common_chat_templates_ptr          g_chat_templates;
 static common_sampler                   * g_sampler;
+static int                                 g_n_ctx = DEFAULT_CONTEXT_SIZE;
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -58,17 +59,19 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_init(JNIEnv *env, jobject /*unu
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstring jmodel_path) {
+Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstring jmodel_path, jint jn_ctx) {
     llama_model_params model_params = llama_model_default_params();
     
-    // 显式启用 mmap（内存映射），实现按需加载
-    // 这样模型不需要完全加载到内存，操作系统会按需加载页面
-    model_params.use_mmap = true;
-    model_params.use_mlock = false;  // Android 上禁用 mlock
+    // 关闭 mmap，将模型全部加载到物理内存
+    // 避免推理时缺页中断导致卡顿
+    model_params.use_mmap = false;
+    model_params.use_mlock = false;  // Android 上 mlock 需要 root 权限
 
     const auto *model_path = env->GetStringUTFChars(jmodel_path, 0);
+    const int n_ctx = (jn_ctx > 0) ? jn_ctx : DEFAULT_CONTEXT_SIZE;
+    g_n_ctx = n_ctx;
     LOGd("%s: Loading model from: \n%s\n", __func__, model_path);
-    LOGi("%s: Using mmap for memory-efficient loading", __func__);
+    LOGi("%s: Full load into physical memory (mmap=off, n_ctx=%d)", __func__, n_ctx);
 
     auto *model = llama_model_load_from_file(model_path, model_params);
     env->ReleaseStringUTFChars(jmodel_path, model_path);
@@ -119,7 +122,7 @@ static common_sampler *new_sampler(float temp) {
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_prepare(JNIEnv * /*env*/, jobject /*unused*/) {
-    auto *context = init_context(g_model);
+    auto *context = init_context(g_model, g_n_ctx);
     if (!context) { return 1; }
     g_context = context;
     g_batch = llama_batch_init(BATCH_SIZE, 0, 1);
@@ -333,7 +336,7 @@ static int decode_tokens_in_batches(
         LOGv("%s: Preparing a batch size of %d starting at: %d", __func__, cur_batch_size, i);
 
         // Shift context if current batch cannot fit into the context
-        if (start_pos + i + cur_batch_size >= DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM) {
+        if (start_pos + i + cur_batch_size >= g_n_ctx - OVERFLOW_HEADROOM) {
             LOGw("%s: Current batch won't fit into context! Shifting...", __func__);
             shift_context();
         }
@@ -387,7 +390,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processSystemPrompt(
     }
 
     // Handle context overflow
-    const int max_batch_size = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
+    const int max_batch_size = g_n_ctx - OVERFLOW_HEADROOM;
     if ((int) system_tokens.size() > max_batch_size) {
         LOGe("%s: System prompt too long for context! %d tokens, max: %d",
              __func__, (int) system_tokens.size(), max_batch_size);
@@ -436,7 +439,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processUserPrompt(
 
     // Ensure user prompt doesn't exceed the context size by truncating if necessary.
     const int user_prompt_size = (int) user_tokens.size();
-    const int max_batch_size = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
+    const int max_batch_size = g_n_ctx - OVERFLOW_HEADROOM;
     if (user_prompt_size > max_batch_size) {
         const int skipped_tokens = user_prompt_size - max_batch_size;
         user_tokens.resize(max_batch_size);
@@ -496,7 +499,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_generateNextToken(
         jobject /*unused*/
 ) {
     // Infinite text generation via context shifting
-    if (current_position >= DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM) {
+    if (current_position >= g_n_ctx - OVERFLOW_HEADROOM) {
         LOGw("%s: Context full! Shifting...", __func__);
         shift_context();
     }
