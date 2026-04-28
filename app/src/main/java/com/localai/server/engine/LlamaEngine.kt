@@ -206,11 +206,25 @@ class LlamaEngine @Inject constructor(
     }
     
     fun isModelLoaded(): Boolean {
+        // 同时检查本地标志和engine状态，防止竞态导致的状态不一致
+        if (!isModelLoaded) return false
+        
         val engineState = engine.state.value
-        Log.d(TAG, "isModelLoaded() check: localFlag=$isModelLoaded, engineState=${engineState.javaClass.simpleName}")
-        // Only check local flag; engine state check is done by sendUserPrompt internally
-        // If engine state is wrong, sendUserPrompt will throw IllegalStateException
-        return isModelLoaded
+        val engineReady = engineState is InferenceEngine.State.ModelReady ||
+                          engineState is InferenceEngine.State.Generating ||
+                          engineState is InferenceEngine.State.ProcessingUserPrompt ||
+                          engineState is InferenceEngine.State.ProcessingSystemPrompt
+        
+        Log.d(TAG, "isModelLoaded() check: localFlag=$isModelLoaded, engineState=${engineState.javaClass.simpleName}, engineReady=$engineReady")
+        
+        // 如果引擎状态异常但本地标志为true，重置本地标志
+        if (!engineReady && isModelLoaded) {
+            Log.w(TAG, "Engine state mismatch! Resetting isModelLoaded flag. Engine was: ${engineState.javaClass.simpleName}")
+            isModelLoaded = false
+            return false
+        }
+        
+        return engineReady
     }
     
     /**
@@ -223,6 +237,7 @@ class LlamaEngine @Inject constructor(
         topK: Int = 40, 
         topP: Float = 0.9f
     ): String = withContext(Dispatchers.IO) {
+        // 重新检查模型状态，确保同步检查
         if (!isModelLoaded()) throw IllegalStateException("模型未加载或引擎状态异常")
         
         try {
@@ -242,8 +257,20 @@ class LlamaEngine @Inject constructor(
             
             Log.d(TAG, "Generated ${result.length} characters")
             result.toString()
+        } catch (e: IllegalStateException) {
+            // Engine state mismatch - reset local flag
+            Log.e(TAG, "Engine state mismatch during generation", e)
+            isModelLoaded = false
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Generation failed", e)
+            // 检查engine状态是否异常，如果是则重置标志
+            val state = engine.state.value
+            if (state !is InferenceEngine.State.ModelReady && 
+                state !is InferenceEngine.State.Generating) {
+                Log.w(TAG, "Engine state abnormal, resetting isModelLoaded flag. State: ${state.javaClass.simpleName}")
+                isModelLoaded = false
+            }
             throw e
         }
     }

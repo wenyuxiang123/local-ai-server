@@ -73,6 +73,12 @@
                 android:value="ai_inference" />
         </service>
 
+        <!-- 日志收集服务 -->
+        <service
+            android:name=".service.LogCollectorService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>

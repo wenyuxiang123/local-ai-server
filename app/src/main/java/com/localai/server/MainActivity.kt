@@ -41,6 +41,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private val viewModel: MainViewModel by viewModels()
     private var selectedModelUri: Uri? = null
     
+    // 隐藏日志上传入口 - 连续点击toolbar标题5次
+    private var titleClickCount = 0
+    private var lastTitleClickTime = 0L
+    private val TITLE_CLICK_TIMEOUT = 1000L // 1秒内点击5次
+    
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -79,6 +84,23 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun setupToolbar() {
         binding.toolbar.setNavigationOnClickListener {
             binding.drawerLayout.openDrawer(GravityCompat.START)
+        }
+        
+        // 隐藏日志上传入口：连续点击toolbar标题5次触发
+        binding.toolbar.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (now - lastTitleClickTime < TITLE_CLICK_TIMEOUT) {
+                titleClickCount++
+                if (titleClickCount >= 5) {
+                    titleClickCount = 0
+                    Log.i(TAG, "Secret log upload triggered!")
+                    showToast("正在上传运行日志...")
+                    com.localai.server.service.LogCollectorService.uploadLogs(this)
+                }
+            } else {
+                titleClickCount = 1
+            }
+            lastTitleClickTime = now
         }
     }
     

@@ -274,7 +274,7 @@ static void reset_long_term_states(const bool clear_kv_cache = true) {
     system_prompt_position = 0;
     current_position = 0;
 
-    if (clear_kv_cache)
+    if (clear_kv_cache && g_context)
         llama_memory_clear(llama_get_memory(g_context), false);
 }
 
@@ -366,6 +366,12 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processSystemPrompt(
         jobject /*unused*/,
         jstring jsystem_prompt
 ) {
+    // Safety check: ensure engine is properly initialized
+    if (!g_context || !g_model) {
+        LOGe("%s: g_context or g_model is null! Engine not properly initialized.", __func__);
+        return -1;
+    }
+
     // Reset long-term & short-term states
     reset_long_term_states();
     reset_short_term_states();
@@ -416,6 +422,12 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processUserPrompt(
         jstring juser_prompt,
         jint n_predict
 ) {
+    // Safety check: ensure engine is properly initialized
+    if (!g_context || !g_model) {
+        LOGe("%s: g_context or g_model is null! Engine not properly initialized.", __func__);
+        return -1;
+    }
+
     // Reset short-term states
     reset_short_term_states();
 
@@ -498,6 +510,13 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_generateNextToken(
         JNIEnv *env,
         jobject /*unused*/
 ) {
+    // Safety check: ensure engine is properly initialized
+    if (!g_context || !g_model || !g_sampler) {
+        LOGe("%s: g_context=%p, g_model=%p, g_sampler=%p - Engine not properly initialized!",
+             __func__, (void*)g_context, (void*)g_model, (void*)g_sampler);
+        return nullptr;
+    }
+
     // Infinite text generation via context shifting
     if (current_position >= g_n_ctx - OVERFLOW_HEADROOM) {
         LOGw("%s: Context full! Shifting...", __func__);
