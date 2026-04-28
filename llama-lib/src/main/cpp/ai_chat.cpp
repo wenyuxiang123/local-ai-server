@@ -64,7 +64,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstr
     
     // 关闭 mmap，将模型全部加载到物理内存
     // 避免推理时缺页中断导致卡顿
-    model_params.use_mmap = false;
+    model_params.use_mmap = true;
     model_params.use_mlock = false;  // Android 上 mlock 需要 root 权限
 
     const auto *model_path = env->GetStringUTFChars(jmodel_path, 0);

@@ -89,7 +89,8 @@ class LogCollectorService : Service() {
     private fun startLogCollection() {
         serviceScope.launch {
             try {
-                val logDir = File(filesDir, LOG_DIR)
+                val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                val logDir = File(downloadDir, "LocalAI_Logs")
                 if (!logDir.exists()) {
                     logDir.mkdirs()
                     Log.i(TAG, "Created log directory: ${logDir.absolutePath}")
@@ -169,6 +170,18 @@ class LogCollectorService : Service() {
                 
                 // Flush the writer before uploading
                 logWriter?.flush()
+                
+                // 复制到公共Download目录方便手动查看
+                try {
+                    val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                    val publicLogDir = File(downloadDir, "LocalAI_Logs")
+                    if (!publicLogDir.exists()) publicLogDir.mkdirs()
+                    val publicCopy = File(publicLogDir, "latest_${logFile.name}")
+                    logFile.copyTo(publicCopy, overwrite = true)
+                    Log.i(TAG, "Log copied to public dir: ${publicCopy.absolutePath}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to copy log to public dir: ${e.message}")
+                }
                 
                 Log.i(TAG, "Uploading log file: ${logFile.name} (${logFile.length()} bytes)")
                 
