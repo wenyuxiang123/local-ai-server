@@ -20,7 +20,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="DeepSeek-R1-Distill-Qwen-7B"
+        android:text="Qwen3-4B-Q4_K_M"
         android:textSize="12sp"
         android:textColor="@color/text_secondary" />
 

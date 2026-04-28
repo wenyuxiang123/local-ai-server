@@ -31,13 +31,13 @@ class ModelExtractor @Inject constructor(
         private const val PREFS_NAME = "model_extractor"
         private const val KEY_MODEL_EXTRACTED = "model_extracted"
         private const val KEY_MODEL_VERSION = "model_version"
-        private const val CURRENT_MODEL_VERSION = "7B_v1"
-        private const val MODEL_FILE_NAME = "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+        private const val CURRENT_MODEL_VERSION = "4B_v1"
+        private const val MODEL_FILE_NAME = "Qwen3-4B-Q4_K_M.gguf"
         private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer
-        private const val EXPECTED_TOTAL_SIZE = 4683073248L // 7B模型原始大小
+        private const val EXPECTED_TOTAL_SIZE = 2684354560L // 4B Q4_K_M模型大小约2.5GB
         
         // 模型下载URL - 请根据实际服务器配置修改
-        private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/master/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+        private const val MODEL_DOWNLOAD_URL = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
     }
     
     private val prefs: SharedPreferences by lazy {

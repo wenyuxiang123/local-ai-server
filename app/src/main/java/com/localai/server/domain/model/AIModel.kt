@@ -33,6 +33,12 @@ data class ModelInfo(
 // ModelScope mirror for China - verified URLs
 val AVAILABLE_MODELS = listOf(
     ModelInfo(
+        name = "Qwen3-4B-Q4_K_M",
+        url = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+        size = "~2.5GB",
+        description = "通用对话模型，支持思考模式，性能更强"
+    ),
+    ModelInfo(
         name = "Qwen3-1.7B-Q4_K_M",
         url = "https://modelscope.cn/api/v1/models/unsloth/Qwen3-1.7B-GGUF/resolve/master/Qwen3-1.7B-Q4_K_M.gguf",
         size = "~1.1GB",
