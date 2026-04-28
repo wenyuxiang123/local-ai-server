@@ -114,7 +114,7 @@ private val MODEL_DOWNLOAD_URLS = listOf(
         for ((index, downloadUrl) in MODEL_DOWNLOAD_URLS.withIndex()) {
             val sourceName = if (index == 0) "ModelScope" else "HuggingFace"
             Log.i(TAG, "Trying download from $sourceName: $downloadUrl")
-            com.localai.server.util.FileLog.i("ModelExtractor", "Trying download from $sourceName: $downloadUrl")
+            com.localai.server.util.FileLog.log("ModelExtractor", "Trying download from $sourceName: $downloadUrl")
             emit(ExtractProgress(1, "连接 $sourceName 服务器..."))
             
             try {
@@ -205,14 +205,14 @@ private val MODEL_DOWNLOAD_URLS = listOf(
                 connection.connect()
                 
                 val responseCode = connection.responseCode
-                com.localai.server.util.FileLog.i("ModelExtractor", "URL: $currentUrl, Response: $responseCode")
+                com.localai.server.util.FileLog.log("ModelExtractor", "URL: $currentUrl, Response: $responseCode")
                 
                 if (responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
                     responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
                     responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
                     responseCode == 307 || responseCode == 308) {
                     val location = connection.getHeaderField("Location")
-                    com.localai.server.util.FileLog.i("ModelExtractor", "Redirect to: $location")
+                    com.localai.server.util.FileLog.log("ModelExtractor", "Redirect to: $location")
                     connection.disconnect()
                     if (location.isNullOrEmpty()) {
                         throw Exception("重定向但未提供Location头")
@@ -228,16 +228,17 @@ private val MODEL_DOWNLOAD_URLS = listOf(
                 break
             }
             
-            com.localai.server.util.FileLog.i("ModelExtractor", "Final URL: $currentUrl")
+            com.localai.server.util.FileLog.log("ModelExtractor", "Final URL: $currentUrl")
             
-            val contentLength = connection.contentLength.toLong()
+            val finalConnection = connection ?: throw Exception("连接失败")
+            val contentLength = finalConnection.contentLength.toLong()
             // 如果服务器不返回Content-Length，使用预期大小
             val totalSize = if (contentLength > 0) contentLength else EXPECTED_TOTAL_SIZE
             Log.i(TAG, "Content-Length: $contentLength, using totalSize: $totalSize")
             
             emit(ExtractProgress(2, "开始下载模型 (0%)"))
             
-            connection.inputStream.use { input ->
+            finalConnection.inputStream.use { input ->
                 FileOutputStream(modelFile).use { output ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var read: Int
