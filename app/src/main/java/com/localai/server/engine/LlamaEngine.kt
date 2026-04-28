@@ -205,7 +205,11 @@ class LlamaEngine @Inject constructor(
         }
     }
     
-    fun isModelLoaded(): Boolean = isModelLoaded
+    fun isModelLoaded(): Boolean {
+        // Also check InferenceEngine state - if it is in Error or non-ready state, treat as not loaded
+        val engineState = _state.value
+        return isModelLoaded && engineState is InferenceEngine.State.ModelReady
+    }
     
     /**
      * 同步生成（等待完整结果）
@@ -217,7 +221,7 @@ class LlamaEngine @Inject constructor(
         topK: Int = 40, 
         topP: Float = 0.9f
     ): String = withContext(Dispatchers.IO) {
-        if (!isModelLoaded) throw IllegalStateException("模型未加载")
+        if (!isModelLoaded()) throw IllegalStateException("模型未加载或引擎状态异常")
         
         try {
             Log.d(TAG, "Generating response for prompt: ${prompt.take(50)}...")
@@ -252,7 +256,7 @@ class LlamaEngine @Inject constructor(
         topK: Int = 40, 
         topP: Float = 0.9f
     ): Flow<String> {
-        if (!isModelLoaded) throw IllegalStateException("模型未加载")
+        if (!isModelLoaded()) throw IllegalStateException("模型未加载或引擎状态异常")
         
         Log.d(TAG, "Streaming generation for prompt: ${prompt.take(50)}...")
         return engine.sendUserPrompt(prompt, maxTokens)

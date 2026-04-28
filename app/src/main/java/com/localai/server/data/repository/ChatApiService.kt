@@ -94,13 +94,28 @@ class ChatApiService @Inject constructor() {
                     Log.d(TAG, "Response body: ${body?.take(200)}")
                     
                     if (!response.isSuccessful) {
+                        // Parse error details from response body
+                        val errorDetail = try {
+                            val jsonObj = body?.let { gson.fromJson(it, com.google.gson.JsonObject::class.java) }
+                            jsonObj?.getAsJsonObject("error")?.get("message")?.asString 
+                                ?: response.message
+                        } catch (_: Exception) {
+                            response.message
+                        }
+                        
                         // 503 means model not ready, don't retry
                         if (response.code == 503) {
                             return@withContext Result.failure(
-                                IOException("模型未加载，请先加载模型")
+                                IOException("模型未加载: $errorDetail")
                             )
                         }
-                        lastException = IOException("HTTP ${response.code}: ${response.message}")
+                        // Don't retry 500 errors that indicate engine state issues
+                        if (response.code == 500 && errorDetail.contains("状态异常")) {
+                            return@withContext Result.failure(
+                                IOException("AI服务错误: $errorDetail")
+                            )
+                        }
+                        lastException = IOException("HTTP ${response.code}: $errorDetail")
                         if (attempt < maxRetries - 1) {
                             Thread.sleep(2000L * (attempt + 1))
                             return@repeat

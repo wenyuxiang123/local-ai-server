@@ -16,6 +16,8 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * HTTP 服务器，提供 OpenAI 兼容 API
  */
+data class GenerationResult(val result: String?, val error: String? = null)
+
 class AiHttpServer(
     private val engine: LlamaEngine,
     port: Int = 8080
@@ -114,17 +116,23 @@ class AiHttpServer(
                             temperature = request.temperature ?: 0.7f
                         )
                     }
+                } catch (e: IllegalStateException) {
+                    Log.e(TAG, "Engine state error: ${e.message}", e)
+                    return@runBlocking GenerationResult(null, "模型状态异常: ${e.message}")
+                } catch (e: java.util.concurrent.TimeoutCancellationException) {
+                    Log.e(TAG, "Generation timeout", e)
+                    return@runBlocking GenerationResult(null, "生成超时，模型推理时间过长")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Generation failed", e)
-                    null
+                    Log.e(TAG, "Generation failed: ${e.message}", e)
+                    return@runBlocking GenerationResult(null, "生成失败: ${e.message}")
                 }
             }
 
-            if (response == null) {
-                return errorResponse("Generation failed", 500)
+            if (response.result == null) {
+                return errorResponse(response.error ?: "Generation failed", 500)
             }
 
-            Log.i(TAG, "Generated response: ${response.take(100)}...")
+            Log.i(TAG, "Generated response: ${response.result?.take(100)}...")
 
             // 构建响应
             val chatResponse = ChatResponse(
@@ -134,15 +142,15 @@ class AiHttpServer(
                         index = 0,
                         message = ResponseMessage(
                             role = "assistant",
-                            content = response
+                            content = response.result!!
                         ),
                         finish_reason = "stop"
                     )
                 ),
                 usage = Usage(
                     prompt_tokens = prompt.length / 4,
-                    completion_tokens = response.length / 4,
-                    total_tokens = (prompt.length + response.length) / 4
+                    completion_tokens = response.result!!.length / 4,
+                    total_tokens = (prompt.length + response.result!!.length) / 4
                 )
             )
 
