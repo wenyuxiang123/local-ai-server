@@ -61,8 +61,8 @@ class ModelDownloadManager @Inject constructor(
                 "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf"
             ),
             "Qwen3-4B-Q4_K_M" to listOf(
-                "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
-                "https://modelscope.cn/api/v1/models/Qwen/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q4_K_M.gguf"
+                "https://modelscope.cn/api/v1/models/unsloth/Qwen3-4B-GGUF/file/Qwen3-4B-Q4_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
             )
         )
         
@@ -450,7 +450,7 @@ class ModelDownloadManager @Inject constructor(
         return listOf(
             ModelInfo("DeepSeek-R1-Distill-Qwen-1.5B-Q8_0", "~1.6GB", "推理模型，展示思考过程，适合手机"),
             ModelInfo("DeepSeek-R1-Distill-Qwen-7B-Q4_K_M", "~4.3GB", "推理模型，更强推理能力"),
-            ModelInfo("Qwen3-4B-Q4_K_M", "~2.5GB", "通用对话模型，支持思考模式，性能更强"),
+            ModelInfo("Qwen3-4B-Q4_K_M", "~2.3GB", "通用对话模型，支持思考模式，性能更强"),
             ModelInfo("Qwen3-1.7B-Q4_K_M", "~1.1GB", "通用对话模型，速度快"),
             ModelInfo("Qwen3-0.6B-Q4_K_M", "~400MB", "超轻量级，极速响应")
         )
