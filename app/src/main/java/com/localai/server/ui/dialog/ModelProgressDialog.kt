@@ -12,11 +12,13 @@ import java.text.DecimalFormat
 /**
  * 模型进度弹窗管理器
  * 管理三个阶段：下载、等待加载、加载中
+ * 防止弹窗重复显示和闪烁
  */
 class ModelProgressDialog(private val context: Context) {
 
     private var currentDialog: Dialog? = null
     private var currentType: DialogType? = null
+    private var isShowing = false  // 添加状态标志，防止竞态条件
     
     private val decimalFormat = DecimalFormat("#.#")
 
@@ -26,13 +28,23 @@ class ModelProgressDialog(private val context: Context) {
         LOADING      // 加载中
     }
 
+    @Synchronized
     fun show(type: DialogType) {
-        // 如果类型相同且对话框已显示，不重新创建
-        if (currentType == type && currentDialog?.isShowing == true) {
+        // 如果正在显示相同类型，不重新创建
+        if (currentType == type && isShowing && currentDialog?.isShowing == true) {
             return
         }
         
-        dismiss()
+        // 防止快速重复调用导致的闪烁
+        if (isShowing && currentDialog?.isShowing == true) {
+            // 相同类型但正在显示中，直接返回
+            if (currentType == type) {
+                return
+            }
+            // 不同类型，先dismiss再重建
+            dismissInternal()
+        }
+        
         currentType = type
         
         val view = when (type) {
@@ -45,8 +57,32 @@ class ModelProgressDialog(private val context: Context) {
             setContentView(view)
             setCancelable(false)
             setCanceledOnTouchOutside(false)
+            setOnDismissListener {
+                isShowing = false
+            }
+            setOnCancelListener {
+                isShowing = false
+            }
             show()
+            isShowing = true
         }
+    }
+    
+    @Synchronized
+    private fun dismissInternal() {
+        try {
+            currentDialog?.dismiss()
+        } catch (e: Exception) {
+            // 忽略已dismiss的异常
+        }
+        currentDialog = null
+        isShowing = false
+    }
+
+    @Synchronized
+    fun dismiss() {
+        dismissInternal()
+        currentType = null
     }
 
     private fun createDownloadView(): View {
@@ -59,12 +95,6 @@ class ModelProgressDialog(private val context: Context) {
         return view
     }
 
-    fun dismiss() {
-        currentDialog?.dismiss()
-        currentDialog = null
-        currentType = null
-    }
-
     /**
      * 更新下载进度
      */
@@ -75,6 +105,7 @@ class ModelProgressDialog(private val context: Context) {
         speedBytesPerSec: Long
     ) {
         if (currentType != DialogType.DOWNLOAD) return
+        if (!isShowing || currentDialog?.isShowing != true) return
         
         currentDialog?.findViewById<TextView>(R.id.tv_percent)?.text = "$percent%"
         currentDialog?.findViewById<ProgressBar>(R.id.progress_bar)?.progress = percent
@@ -101,6 +132,7 @@ class ModelProgressDialog(private val context: Context) {
      */
     fun updateLoadingProgress(percent: Int, logMessage: String) {
         if (currentType != DialogType.WAITING && currentType != DialogType.LOADING) return
+        if (!isShowing || currentDialog?.isShowing != true) return
         
         currentDialog?.findViewById<TextView>(R.id.tv_percent)?.text = "$percent%"
         currentDialog?.findViewById<ProgressBar>(R.id.progress_bar)?.progress = percent
@@ -119,6 +151,7 @@ class ModelProgressDialog(private val context: Context) {
      */
     fun appendLog(message: String) {
         if (currentType != DialogType.WAITING && currentType != DialogType.LOADING) return
+        if (!isShowing || currentDialog?.isShowing != true) return
         
         currentDialog?.findViewById<TextView>(R.id.tv_log)?.let {
             val currentText = it.text.toString()
@@ -126,5 +159,6 @@ class ModelProgressDialog(private val context: Context) {
         }
     }
 
-    fun isShowing(): Boolean = currentDialog?.isShowing == true
+    @Synchronized
+    fun isShowing(): Boolean = isShowing && currentDialog?.isShowing == true
 }

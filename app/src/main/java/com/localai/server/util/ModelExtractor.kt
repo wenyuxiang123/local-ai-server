@@ -36,8 +36,18 @@ class ModelExtractor @Inject constructor(
         private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer
         private const val EXPECTED_TOTAL_SIZE = 2684354560L // 4B Q4_K_M模型大小约2.5GB
         
-        // 模型下载URL - 请根据实际服务器配置修改
-        private const val MODEL_DOWNLOAD_URL = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
+/**
+ * 模型下载URL列表 - 按优先级排序
+ * 优先使用ModelScope国内源，HuggingFace作为备选
+ */
+private val MODEL_DOWNLOAD_URLS = listOf(
+    // 1. ModelScope主源（国内，速度快）
+    "https://modelscope.cn/api/v1/models/Qwen/Qwen3-4B-GGUF/file/Qwen3-4B-Q4_K_M.gguf",
+    // 2. HuggingFace备选源
+    "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
+)
+
+private const val MODEL_DOWNLOAD_URL = MODEL_DOWNLOAD_URLS.first()
     }
     
     private val prefs: SharedPreferences by lazy {
@@ -87,6 +97,7 @@ class ModelExtractor @Inject constructor(
      * 解压/下载模型文件
      * 从URL下载到 filesDir/models/
      * 包含三个阶段：下载、等待加载、加载中
+     * 支持多URL自动fallback
      */
     fun extractModel(): Flow<ExtractProgress> = flow {
         // 检查模型文件是否已存在
@@ -99,13 +110,37 @@ class ModelExtractor @Inject constructor(
         // 确保目录存在
         modelsDir.mkdirs()
         
-        // 阶段1：下载
+        // 阶段1：下载（支持多URL fallback）
         emit(ExtractProgress(0, "准备下载模型..."))
-        Log.i(TAG, "Starting model download from: $MODEL_DOWNLOAD_URL")
-        emit(ExtractProgress(1, "连接服务器..."))
         
-        // 从URL下载模型文件
-        downloadModel(MODEL_DOWNLOAD_URL)
+        var lastException: Exception? = null
+        var downloadedFromUrl: String? = null
+        
+        for ((index, downloadUrl) in MODEL_DOWNLOAD_URLS.withIndex()) {
+            val sourceName = if (index == 0) "ModelScope" else "HuggingFace"
+            Log.i(TAG, "Trying download from $sourceName: $downloadUrl")
+            emit(ExtractProgress(1, "连接 $sourceName 服务器..."))
+            
+            try {
+                downloadModelWithFallback(downloadUrl)
+                downloadedFromUrl = downloadUrl
+                Log.i(TAG, "Download successful from $sourceName")
+                break
+            } catch (e: Exception) {
+                Log.w(TAG, "Download failed from $sourceName: ${e.message}")
+                lastException = e
+                
+                // 如果不是最后一个URL，尝试下一个
+                if (index < MODEL_DOWNLOAD_URLS.size - 1) {
+                    emit(ExtractProgress(1, "$sourceName 下载失败，尝试备选源..."))
+                }
+            }
+        }
+        
+        // 如果所有URL都失败，抛出异常
+        if (downloadedFromUrl == null) {
+            throw lastException ?: Exception("所有下载源均失败")
+        }
         
         // 阶段2：等待加载
         emit(ExtractProgress(98, "下载完成"))
@@ -141,6 +176,13 @@ class ModelExtractor @Inject constructor(
             .apply()
         emit(ExtractProgress(-1, "下载失败: ${e.message}"))
     }.flowOn(Dispatchers.IO)
+    
+    /**
+     * 从单个URL下载模型文件
+     */
+    private suspend fun FlowCollector<ExtractProgress>.downloadModelWithFallback(urlString: String) {
+        downloadModel(urlString)
+    }
     
     /**
      * 从URL下载模型文件
