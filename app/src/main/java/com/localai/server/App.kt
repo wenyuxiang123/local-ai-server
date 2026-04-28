@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import com.localai.server.engine.LlamaEngine
 import com.localai.server.service.LogCollectorService
+import com.localai.server.util.FileLog
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -23,6 +24,7 @@ class App : Application() {
         // 初始化LlamaEngine
         LlamaEngine.initialize(this)
         // 启动日志收集服务
+        FileLog.init()
         LogCollectorService.start(this)
     }
     

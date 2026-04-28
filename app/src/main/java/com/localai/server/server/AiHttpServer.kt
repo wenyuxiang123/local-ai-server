@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.TimeoutCancellationException
+import com.localai.server.util.FileLog
 
 /**
  * HTTP 服务器，提供 OpenAI 兼容 API
@@ -97,6 +98,7 @@ class AiHttpServer(
             val modelLoaded = engine.isModelLoaded()
             val modelName = engine.getLoadedModelName()
             Log.i(TAG, "Chat request received: modelLoaded=$modelLoaded, modelName=$modelName")
+            FileLog.log(TAG, "Chat request: modelLoaded=$modelLoaded, model=$modelName, messages=${request.messages?.size}")
             if (!modelLoaded) {
                 Log.w(TAG, "Model not loaded! Returning 503")
                 return errorResponse("Model not loaded", 503)
@@ -106,6 +108,7 @@ class AiHttpServer(
             val prompt = buildPrompt(request.messages)
 
             Log.i(TAG, "Processing prompt: ${prompt.take(100)}...")
+            FileLog.log(TAG, "Processing prompt: ${prompt.take(100)}..., maxTokens=${request.max_tokens ?: 2048}")
 
             // 同步生成响应
             var generatedText: String? = null
@@ -113,19 +116,20 @@ class AiHttpServer(
             
             runBlocking {
                 try {
-                    generatedText = withTimeout(120_000L) {
+                    generatedText = withTimeout(600_000L) {
                         engine.generate(
                             prompt = prompt,
                             maxTokens = request.max_tokens ?: 2048,
                             temperature = request.temperature ?: 0.7f
                         )
                     }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    Log.e(TAG, "Generation timeout after 600s", e)
+                    genError = "生成超时(600s)，模型推理时间过长，请减少输入长度或换用更小模型"
+                    FileLog.log(TAG, "Generation TIMEOUT after 600s")
                 } catch (e: IllegalStateException) {
                     Log.e(TAG, "Engine state error: ${e.message}", e)
                     genError = "模型状态异常: ${e.message}"
-                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                    Log.e(TAG, "Generation timeout", e)
-                    genError = "生成超时，模型推理时间过长"
                 } catch (e: Exception) {
                     Log.e(TAG, "Generation failed: ${e.message}", e)
                     genError = "生成失败: ${e.message}"
@@ -137,6 +141,7 @@ class AiHttpServer(
             }
 
             Log.i(TAG, "Generated response: ${generatedText.take(100)}...")
+            FileLog.log(TAG, "Generated response: ${generatedText.length} chars, first=${generatedText.take(50)}")
 
             // 构建响应
             val chatResponse = ChatResponse(

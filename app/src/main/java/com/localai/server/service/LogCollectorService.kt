@@ -103,9 +103,12 @@ class LogCollectorService : Service() {
                 
                 Log.i(TAG, "Starting log collection to: ${logFile.absolutePath}")
                 
-                // Build logcat command with tag filters
-                val tagFilter = FILTER_TAGS.joinToString(":V ") + ":V *:S"
-                val command = arrayOf("logcat", "-v", "threadtime", tagFilter)
+                // Build logcat command with proper separate arguments
+                val pid = android.os.Process.myPid().toString()
+                val commandArgs = mutableListOf("logcat", "-v", "threadtime", "--pid=$pid")
+                FILTER_TAGS.forEach { commandArgs.add("$it:V") }
+                commandArgs.add("*:S")
+                val command = commandArgs.toTypedArray()
                 Log.d(TAG, "Logcat command: ${command.joinToString(" ")}")
                 
                 logProcess = Runtime.getRuntime().exec(command)

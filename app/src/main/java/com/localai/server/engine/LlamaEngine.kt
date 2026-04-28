@@ -23,6 +23,7 @@ import kotlinx.coroutines.withTimeout
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.localai.server.util.FileLog
 
 /**
  * LlamaEngine 基于 llama.cpp 官方 Android 绑定实现
@@ -144,6 +145,7 @@ class LlamaEngine @Inject constructor(
             }
             
             Log.i(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB")
+            FileLog.log(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB, nCtx=$nCtx, nThreads=$nThreads")
             Log.i(TAG, "Context size: $nCtx, Threads: $nThreads")
             
             // 使用官方 API 加载模型，传入上下文大小
@@ -159,6 +161,7 @@ class LlamaEngine @Inject constructor(
             loadedModelName = file.name
             
             Log.i(TAG, "Model loaded successfully: ${file.name}")
+            FileLog.log(TAG, "Model loaded successfully: ${file.name}")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load model", e)
@@ -242,6 +245,8 @@ class LlamaEngine @Inject constructor(
         
         try {
             Log.d(TAG, "Generating response for prompt: ${prompt.take(50)}...")
+            val genStartTime = System.currentTimeMillis()
+            FileLog.log(TAG, "Starting generation, prompt=${prompt.take(50)}..., maxTokens=$maxTokens")
             
             val result = StringBuilder()
             engine.sendUserPrompt(prompt, maxTokens)
@@ -255,7 +260,9 @@ class LlamaEngine @Inject constructor(
                 }
                 .collect { }
             
-            Log.d(TAG, "Generated ${result.length} characters")
+            val genDuration = System.currentTimeMillis() - genStartTime
+            Log.d(TAG, "Generated ${result.length} characters in ${genDuration}ms")
+            FileLog.log(TAG, "Generation complete: ${result.length} chars in ${genDuration}ms")
             result.toString()
         } catch (e: IllegalStateException) {
             // Engine state mismatch - reset local flag
@@ -264,6 +271,7 @@ class LlamaEngine @Inject constructor(
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Generation failed", e)
+            FileLog.log(TAG, "Generation failed: ${e.message}")
             // 检查engine状态是否异常，如果是则重置标志
             val state = engine.state.value
             if (state !is InferenceEngine.State.ModelReady && 
