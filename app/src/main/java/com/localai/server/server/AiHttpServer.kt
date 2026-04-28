@@ -7,17 +7,14 @@ import com.localai.server.engine.LlamaEngine
 import fi.iki.elonen.NanoHTTPD
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.TimeoutCancellationException
 
 /**
  * HTTP 服务器，提供 OpenAI 兼容 API
  */
-data class GenerationResult(val result: String?, val error: String? = null)
-
 class AiHttpServer(
     private val engine: LlamaEngine,
     port: Int = 8080
@@ -107,9 +104,12 @@ class AiHttpServer(
             Log.i(TAG, "Processing prompt: ${prompt.take(100)}...")
 
             // 同步生成响应
-            val response = runBlocking {
+            var generatedText: String? = null
+            var genError: String? = null
+            
+            runBlocking {
                 try {
-                    withTimeout(120_000) {
+                    generatedText = withTimeout(120_000L) {
                         engine.generate(
                             prompt = prompt,
                             maxTokens = request.max_tokens ?: 2048,
@@ -118,21 +118,21 @@ class AiHttpServer(
                     }
                 } catch (e: IllegalStateException) {
                     Log.e(TAG, "Engine state error: ${e.message}", e)
-                    return@runBlocking GenerationResult(null, "模型状态异常: ${e.message}")
-                } catch (e: java.util.concurrent.TimeoutCancellationException) {
+                    genError = "模型状态异常: ${e.message}"
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                     Log.e(TAG, "Generation timeout", e)
-                    return@runBlocking GenerationResult(null, "生成超时，模型推理时间过长")
+                    genError = "生成超时，模型推理时间过长"
                 } catch (e: Exception) {
                     Log.e(TAG, "Generation failed: ${e.message}", e)
-                    return@runBlocking GenerationResult(null, "生成失败: ${e.message}")
+                    genError = "生成失败: ${e.message}"
                 }
             }
 
-            if (response.result == null) {
-                return errorResponse(response.error ?: "Generation failed", 500)
+            if (generatedText == null) {
+                return errorResponse(genError ?: "Generation failed", 500)
             }
 
-            Log.i(TAG, "Generated response: ${response.result?.take(100)}...")
+            Log.i(TAG, "Generated response: ${generatedText.take(100)}...")
 
             // 构建响应
             val chatResponse = ChatResponse(
@@ -142,15 +142,15 @@ class AiHttpServer(
                         index = 0,
                         message = ResponseMessage(
                             role = "assistant",
-                            content = response.result!!
+                            content = generatedText
                         ),
                         finish_reason = "stop"
                     )
                 ),
                 usage = Usage(
                     prompt_tokens = prompt.length / 4,
-                    completion_tokens = response.result!!.length / 4,
-                    total_tokens = (prompt.length + response.result!!.length) / 4
+                    completion_tokens = generatedText.length / 4,
+                    total_tokens = (prompt.length + generatedText.length) / 4
                 )
             )
 
