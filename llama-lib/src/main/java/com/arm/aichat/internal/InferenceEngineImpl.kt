@@ -147,7 +147,7 @@ internal class InferenceEngineImpl private constructor(
     /**
      * Load the LLM
      */
-    override suspend fun loadModel(pathToModel: String, nCtx: Int = 2048) =
+    override suspend fun loadModel(pathToModel: String, nCtx: Int) =
         withContext(llamaDispatcher) {
             check(_state.value is InferenceEngine.State.Initialized) {
                 "Cannot load model in ${_state.value.javaClass.simpleName}!"
