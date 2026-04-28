@@ -114,6 +114,7 @@ private val MODEL_DOWNLOAD_URLS = listOf(
         for ((index, downloadUrl) in MODEL_DOWNLOAD_URLS.withIndex()) {
             val sourceName = if (index == 0) "ModelScope" else "HuggingFace"
             Log.i(TAG, "Trying download from $sourceName: $downloadUrl")
+            com.localai.server.util.FileLog.i("ModelExtractor", "Trying download from $sourceName: $downloadUrl")
             emit(ExtractProgress(1, "连接 $sourceName 服务器..."))
             
             try {
@@ -189,17 +190,45 @@ private val MODEL_DOWNLOAD_URLS = listOf(
         var lastUpdateTime = startTime
         
         try {
-            val url = URL(urlString)
-            connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 30000
-            connection.readTimeout = 300000 // 5分钟超时
-            connection.requestMethod = "GET"
-            connection.connect()
+            // 手动处理重定向，支持ModelScope的302跳转
+            var currentUrl = urlString
+            var redirectCount = 0
+            val maxRedirects = 5
             
-            val responseCode = connection.responseCode
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("服务器返回错误: $responseCode")
+            while (redirectCount < maxRedirects) {
+                val url = URL(currentUrl)
+                connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 30000
+                connection.readTimeout = 300000 // 5分钟超时
+                connection.requestMethod = "GET"
+                connection.instanceFollowRedirects = false // 手动处理重定向
+                connection.connect()
+                
+                val responseCode = connection.responseCode
+                com.localai.server.util.FileLog.i("ModelExtractor", "URL: $currentUrl, Response: $responseCode")
+                
+                if (responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
+                    responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
+                    responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+                    responseCode == 307 || responseCode == 308) {
+                    val location = connection.getHeaderField("Location")
+                    com.localai.server.util.FileLog.i("ModelExtractor", "Redirect to: $location")
+                    connection.disconnect()
+                    if (location.isNullOrEmpty()) {
+                        throw Exception("重定向但未提供Location头")
+                    }
+                    currentUrl = location
+                    redirectCount++
+                    continue
+                }
+                
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw Exception("服务器返回错误: $responseCode")
+                }
+                break
             }
+            
+            com.localai.server.util.FileLog.i("ModelExtractor", "Final URL: $currentUrl")
             
             val contentLength = connection.contentLength.toLong()
             // 如果服务器不返回Content-Length，使用预期大小
