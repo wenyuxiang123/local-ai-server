@@ -58,13 +58,13 @@ class ModelProgressDialog(private val context: Context) {
             setCancelable(false)
             setCanceledOnTouchOutside(false)
             setOnDismissListener {
-                isShowing = false
+                this@ModelProgressDialog.isShowing = false
             }
             setOnCancelListener {
-                isShowing = false
+                this@ModelProgressDialog.isShowing = false
             }
             show()
-            isShowing = true
+            this@ModelProgressDialog.isShowing = true
         }
     }
     

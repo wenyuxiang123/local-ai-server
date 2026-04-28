@@ -36,18 +36,13 @@ class ModelExtractor @Inject constructor(
         private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer
         private const val EXPECTED_TOTAL_SIZE = 2684354560L // 4B Q4_K_M模型大小约2.5GB
         
-/**
- * 模型下载URL列表 - 按优先级排序
- * 优先使用ModelScope国内源，HuggingFace作为备选
- */
+private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/api/v1/models/Qwen/Qwen3-4B-GGUF/file/Qwen3-4B-Q4_K_M.gguf"
 private val MODEL_DOWNLOAD_URLS = listOf(
     // 1. ModelScope主源（国内，速度快）
     "https://modelscope.cn/api/v1/models/Qwen/Qwen3-4B-GGUF/file/Qwen3-4B-Q4_K_M.gguf",
     // 2. HuggingFace备选源
     "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
 )
-
-private const val MODEL_DOWNLOAD_URL = MODEL_DOWNLOAD_URLS.first()
     }
     
     private val prefs: SharedPreferences by lazy {
