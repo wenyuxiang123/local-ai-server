@@ -16,6 +16,7 @@ import javax.inject.Singleton
 /**
  * 参数自动调优服务
  * 监控设备状态，动态调整推理参数
+ * 支持 llama.cpp 全部优化参数：Vulkan GPU offload、Flash Attention、KV cache 量化等
  */
 @Singleton
 class ParameterTuner @Inject constructor(
@@ -76,7 +77,8 @@ class ParameterTuner @Inject constructor(
         val temperatureLevel: TempLevel = TempLevel.NORMAL,
         val recommendedThreads: Int = 4,
         val recommendedContextSize: Int = 2048,
-        val recommendedBatchSize: Int = 1,
+        val recommendedBatchSize: Int = 512,
+        val recommendedGpuLayers: Int = 0,
         val autoTuningEnabled: Boolean = false
     )
     
@@ -91,22 +93,43 @@ class ParameterTuner @Inject constructor(
     }
     
     /**
-     * 推理配置
+     * 推理配置 - 包含 llama.cpp 全部优化参数
      */
     data class InferenceConfig(
-        val threads: Int = 4,
-        val contextSize: Int = 2048,  // 保持默认值不变，实际值由设备决定
-        val batchSize: Int = 1,
-        val gpuEnabled: Boolean = false,
-        val useMmap: Boolean = true,
-        val useMlock: Boolean = false,
-        val temperature: Float = 0.7f,
-        val maxTokens: Int = 512,
-        val topK: Int = 40,
-        val topP: Float = 0.9f,
-        val repeatPenalty: Float = 1.1f,
+        val threads: Int = 4,                    // CPU 线程数
+        val contextSize: Int = 2048,             // 上下文大小
+        val batchSize: Int = 512,                // 批处理大小
+        val gpuEnabled: Boolean = false,        // GPU 加速启用
+        val gpuLayers: Int = 0,                  // GPU 卸载层数 (0=CPU, -1=全部, >0=指定层数)
+        val flashAttn: Boolean = true,           // Flash Attention 启用
+        val cacheType: String = "f16",           // KV cache 量化类型: "f16", "q8_0", "q4_0", "q5_0", "q5_1"
+        val useMmap: Boolean = true,            // 使用内存映射
+        val useMlock: Boolean = false,           // 使用内存锁定 (需要 root)
+        val temperature: Float = 0.7f,          // 采样温度
+        val maxTokens: Int = 512,               // 最大生成 token 数
+        val topK: Int = 40,                     // Top-K 采样
+        val topP: Float = 0.9f,                // Top-P 采样
+        val repeatPenalty: Float = 1.1f,        // 重复惩罚
         val lastUpdated: Long = System.currentTimeMillis()
-    )
+    ) {
+        /**
+         * 转换为可读的优化信息
+         */
+        fun toReadableString(): String {
+            return buildString {
+                appendLine("=== Llama.cpp Optimization Configuration ===")
+                appendLine("Threads: $threads")
+                appendLine("Context Size: $contextSize")
+                appendLine("Batch Size: $batchSize")
+                appendLine("GPU Enabled: $gpuEnabled (layers: $gpuLayers)")
+                appendLine("Flash Attention: $flashAttn")
+                appendLine("KV Cache Type: $cacheType")
+                appendLine("Memory: mmap=$useMmap, mlock=$useMlock")
+                appendLine("Sampling: temp=$temperature, topK=$topK, topP=$topP")
+                appendLine("Output: maxTokens=$maxTokens, repeatPenalty=$repeatPenalty")
+            }
+        }
+    }
     
     /**
      * 设备信息
@@ -116,7 +139,8 @@ class ParameterTuner @Inject constructor(
         val totalMemory: Long,
         val isLowRamDevice: Boolean,
         val socModel: String,
-        val architecture: String
+        val architecture: String,
+        val hasVulkan: Boolean = false  // Vulkan GPU 支持
     )
     
     init {
@@ -144,8 +168,23 @@ class ParameterTuner @Inject constructor(
             totalMemory = memInfo.totalMem,
             isLowRamDevice = activityManager.isLowRamDevice,
             socModel = getSocModel(),
-            architecture = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+            architecture = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown",
+            hasVulkan = checkVulkanSupport()
         )
+    }
+    
+    /**
+     * 检测 Vulkan 支持
+     */
+    private fun checkVulkanSupport(): Boolean {
+        return try {
+            // 检查 /dev/vulkan 设备或系统属性
+            File("/dev/vulkan").exists() ||
+            System.getProperty("ro.hardware.vulkan") != null ||
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.N  // Android 7.0+ 通常支持 Vulkan
+        } catch (e: Exception) {
+            false
+        }
     }
     
     /**
@@ -164,7 +203,7 @@ class ParameterTuner @Inject constructor(
     }
     
     /**
-     * 初始化设备配置
+     * 初始化设备配置 - 包含 llama.cpp 全部优化参数
      */
     private fun initializeConfigForDevice(deviceInfo: DeviceInfo) {
         val current = _currentConfig.value
@@ -186,6 +225,13 @@ class ParameterTuner @Inject constructor(
             else -> 512  // < 4GB
         }
         
+        // 根据设备能力设置 GPU 参数
+        val gpuLayers = when {
+            deviceInfo.hasVulkan && deviceInfo.totalMemory >= 8L * 1024 * 1024 * 1024 -> -1  // 有 Vulkan 且内存充足，全部 offload
+            deviceInfo.hasVulkan && deviceInfo.totalMemory >= 6L * 1024 * 1024 * 1024 -> 16  // 部分 offload
+            else -> 0  // 纯 CPU
+        }
+        
         // 低内存设备减少配置
         val adjustedContextSize = if (deviceInfo.isLowRamDevice) {
             (contextSize * 0.5).toInt().coerceAtLeast(512)
@@ -193,15 +239,32 @@ class ParameterTuner @Inject constructor(
             contextSize
         }
         
+        // 根据内存决定 KV cache 量化类型
+        val cacheType = when {
+            deviceInfo.totalMemory >= 8L * 1024 * 1024 * 1024 -> "f16"  // 充足内存用 f16
+            deviceInfo.totalMemory >= 6L * 1024 * 1024 * 1024 -> "q8_0"  // 中等内存用 q8_0
+            else -> "q4_0"  // 紧张内存用 q4_0 省 60%
+        }
+        
         _currentConfig.value = current.copy(
             threads = threads,
-            contextSize = adjustedContextSize
+            contextSize = adjustedContextSize,
+            batchSize = 512,  // 固定 512，适合大多数场景
+            gpuEnabled = gpuLayers != 0,
+            gpuLayers = gpuLayers,
+            flashAttn = true,  // 默认开启 Flash Attention
+            cacheType = cacheType
         )
         
         _tuningState.value = _tuningState.value.copy(
             recommendedThreads = threads,
-            recommendedContextSize = adjustedContextSize
+            recommendedContextSize = adjustedContextSize,
+            recommendedBatchSize = 512,
+            recommendedGpuLayers = gpuLayers
         )
+        
+        Log.i(TAG, "Initialized config for device:")
+        Log.i(TAG, _currentConfig.value.toReadableString())
     }
     
     /**
@@ -350,6 +413,11 @@ class ParameterTuner @Inject constructor(
                     newConfig = newConfig.copy(contextSize = (current.contextSize * 0.5).toInt())
                     hasChange = true
                 }
+                // 关闭 GPU offload 减少热量
+                if (current.gpuEnabled && current.gpuLayers > 0) {
+                    newConfig = newConfig.copy(gpuEnabled = false, gpuLayers = 0)
+                    hasChange = true
+                }
             }
             TempLevel.HOT -> {
                 // 发热，适当降低
@@ -359,6 +427,11 @@ class ParameterTuner @Inject constructor(
                 }
                 if (current.contextSize > 1024) {
                     newConfig = newConfig.copy(contextSize = (current.contextSize * 0.75).toInt())
+                    hasChange = true
+                }
+                // 减少 GPU 层数
+                if (current.gpuEnabled && current.gpuLayers > 8) {
+                    newConfig = newConfig.copy(gpuLayers = current.gpuLayers / 2)
                     hasChange = true
                 }
             }
@@ -372,8 +445,9 @@ class ParameterTuner @Inject constructor(
                     newConfig = newConfig.copy(contextSize = (current.contextSize * 0.5).toInt())
                     hasChange = true
                 }
-                if (current.batchSize > 1) {
-                    newConfig = newConfig.copy(batchSize = 1)
+                // 启用 KV cache 量化节省内存
+                if (current.cacheType == "f16") {
+                    newConfig = newConfig.copy(cacheType = "q4_0")
                     hasChange = true
                 }
             }
@@ -396,10 +470,11 @@ class ParameterTuner @Inject constructor(
             _tuningState.value = _tuningState.value.copy(
                 recommendedThreads = newConfig.threads,
                 recommendedContextSize = newConfig.contextSize,
-                recommendedBatchSize = newConfig.batchSize
+                recommendedBatchSize = newConfig.batchSize,
+                recommendedGpuLayers = newConfig.gpuLayers
             )
             saveConfig()
-            Log.i(TAG, "Auto-adjusted config: threads=${newConfig.threads}, context=${newConfig.contextSize}")
+            Log.i(TAG, "Auto-adjusted config: ${newConfig.toReadableString()}")
         }
     }
     
@@ -409,7 +484,7 @@ class ParameterTuner @Inject constructor(
     fun setConfig(config: InferenceConfig) {
         _currentConfig.value = config.copy(lastUpdated = System.currentTimeMillis())
         saveConfig()
-        Log.i(TAG, "Manual config set: $config")
+        Log.i(TAG, "Manual config set: ${config.toReadableString()}")
     }
     
     /**
@@ -420,30 +495,57 @@ class ParameterTuner @Inject constructor(
             Preset.BALANCED -> InferenceConfig(
                 threads = 4,
                 contextSize = 2048,
-                batchSize = 1,
+                batchSize = 512,
+                gpuEnabled = false,
+                gpuLayers = 0,
+                flashAttn = true,
+                cacheType = "f16",
                 temperature = 0.7f,
                 maxTokens = 512
             )
             Preset.PERFORMANCE -> InferenceConfig(
                 threads = 6,
                 contextSize = 4096,
-                batchSize = 2,
+                batchSize = 512,
+                gpuEnabled = true,
+                gpuLayers = -1,
+                flashAttn = true,
+                cacheType = "f16",
                 temperature = 0.8f,
                 maxTokens = 1024
             )
             Preset.BATTERY_SAVER -> InferenceConfig(
                 threads = 2,
                 contextSize = 1024,
-                batchSize = 1,
+                batchSize = 256,
+                gpuEnabled = false,
+                gpuLayers = 0,
+                flashAttn = true,
+                cacheType = "q4_0",
                 temperature = 0.6f,
                 maxTokens = 256
             )
             Preset.QUALITY -> InferenceConfig(
                 threads = 4,
                 contextSize = 3072,
-                batchSize = 1,
+                batchSize = 512,
+                gpuEnabled = false,
+                gpuLayers = 0,
+                flashAttn = true,
+                cacheType = "f16",
                 temperature = 0.9f,
                 maxTokens = 768
+            )
+            Preset.GPU_ACCELERATED -> InferenceConfig(
+                threads = 4,
+                contextSize = 2048,
+                batchSize = 512,
+                gpuEnabled = true,
+                gpuLayers = -1,
+                flashAttn = true,
+                cacheType = "q4_0",  // GPU 内存紧张时用量化
+                temperature = 0.7f,
+                maxTokens = 512
             )
         }
         
@@ -451,7 +553,8 @@ class ParameterTuner @Inject constructor(
         _tuningState.value = _tuningState.value.copy(
             recommendedThreads = config.threads,
             recommendedContextSize = config.contextSize,
-            recommendedBatchSize = config.batchSize
+            recommendedBatchSize = config.batchSize,
+            recommendedGpuLayers = config.gpuLayers
         )
     }
     
@@ -467,6 +570,9 @@ class ParameterTuner @Inject constructor(
                     "contextSize": ${config.contextSize},
                     "batchSize": ${config.batchSize},
                     "gpuEnabled": ${config.gpuEnabled},
+                    "gpuLayers": ${config.gpuLayers},
+                    "flashAttn": ${config.flashAttn},
+                    "cacheType": "${config.cacheType}",
                     "useMmap": ${config.useMmap},
                     "useMlock": ${config.useMlock},
                     "temperature": ${config.temperature},
@@ -491,93 +597,52 @@ class ParameterTuner @Inject constructor(
             if (!configFile.exists()) return
             
             val json = configFile.readText()
-            val parts = json.split("\n")
+            val lines = json.split("\n")
             
-            val threads = parts.find { it.contains("threads") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 4
-            val contextSize = parts.find { it.contains("contextSize") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 2048
-            val batchSize = parts.find { it.contains("batchSize") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 1
-            val temperature = parts.find { it.contains("temperature") }?.split(":")?.get(1)?.trim()?.trim(',')?.toFloatOrNull() ?: 0.7f
-            val maxTokens = parts.find { it.contains("maxTokens") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 512
+            val threads = lines.find { it.contains("threads") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 4
+            val contextSize = lines.find { it.contains("contextSize") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 2048
+            val batchSize = lines.find { it.contains("batchSize") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 512
+            val gpuEnabled = lines.find { it.contains("gpuEnabled") }?.split(":")?.get(1)?.trim()?.trim(',')?.toBoolean() ?: false
+            val gpuLayers = lines.find { it.contains("gpuLayers") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 0
+            val flashAttn = lines.find { it.contains("flashAttn") }?.split(":")?.get(1)?.trim()?.trim(',')?.toBoolean() ?: true
+            val cacheType = lines.find { it.contains("cacheType") }?.split(":")?.get(1)?.trim()?.trim('"', ',') ?: "f16"
+            val temperature = lines.find { it.contains("temperature") }?.split(":")?.get(1)?.trim()?.trim(',')?.toFloatOrNull() ?: 0.7f
+            val maxTokens = lines.find { it.contains("maxTokens") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 512
+            val topK = lines.find { it.contains("topK") }?.split(":")?.get(1)?.trim()?.trim(',')?.toIntOrNull() ?: 40
+            val topP = lines.find { it.contains("topP") }?.split(":")?.get(1)?.trim()?.trim(',')?.toFloatOrNull() ?: 0.9f
+            val repeatPenalty = lines.find { it.contains("repeatPenalty") }?.split(":")?.get(1)?.trim()?.trim(',')?.toFloatOrNull() ?: 1.1f
+            val lastUpdated = lines.find { it.contains("lastUpdated") }?.split(":")?.get(1)?.trim()?.toLongOrNull() ?: System.currentTimeMillis()
             
             _currentConfig.value = InferenceConfig(
                 threads = threads,
                 contextSize = contextSize,
                 batchSize = batchSize,
+                gpuEnabled = gpuEnabled,
+                gpuLayers = gpuLayers,
+                flashAttn = flashAttn,
+                cacheType = cacheType,
                 temperature = temperature,
-                maxTokens = maxTokens
+                maxTokens = maxTokens,
+                topK = topK,
+                topP = topP,
+                repeatPenalty = repeatPenalty,
+                lastUpdated = lastUpdated
             )
             
-            Log.i(TAG, "Config loaded from file")
+            Log.i(TAG, "Loaded config: ${_currentConfig.value.toReadableString()}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load config", e)
         }
     }
     
     /**
-     * 性能预设
+     * 性能预设枚举
      */
     enum class Preset {
-        BALANCED,      // 平衡模式
-        PERFORMANCE,   // 性能模式
-        BATTERY_SAVER, // 省电模式
-        QUALITY        // 质量模式
-    }
-    
-    /**
-     * 获取调优状态报告
-     */
-    fun getStatusReport(): String {
-        val state = _tuningState.value
-        val config = _currentConfig.value
-        val deviceInfo = getDeviceInfo()
-        
-        val tempEmoji = when (state.temperatureLevel) {
-            TempLevel.NORMAL -> "✅"
-            TempLevel.WARM -> "🌡️"
-            TempLevel.HOT -> "🔥"
-            TempLevel.CRITICAL -> "☀️"
-        }
-        
-        val memPercent = (state.memoryUsage * 100).toInt()
-        val memEmoji = when {
-            memPercent > 85 -> "🔴"
-            memPercent > 70 -> "🟡"
-            else -> "🟢"
-        }
-        
-        return buildString {
-            appendLine("📊 设备状态监控")
-            appendLine("=".repeat(40))
-            appendLine()
-            appendLine("🖥️ 设备信息:")
-            appendLine("  • CPU 核心: ${deviceInfo.cores}")
-            appendLine("  • 总内存: ${formatBytes(deviceInfo.totalMemory)}")
-            appendLine("  • SoC: ${deviceInfo.socModel}")
-            appendLine("  • 架构: ${deviceInfo.architecture}")
-            appendLine()
-            appendLine("📈 当前状态:")
-            appendLine("  $tempEmoji 温度: ${String.format("%.1f", state.temperature)}°C")
-            appendLine("  $memEmoji 内存: $memPercent%")
-            appendLine("  • CPU: ${state.cpuUsage.toInt()}%")
-            appendLine()
-            appendLine("⚙️ 当前配置:")
-            appendLine("  • 线程数: ${config.threads}")
-            appendLine("  • 上下文: ${config.contextSize}")
-            appendLine("  • 批大小: ${config.batchSize}")
-            appendLine("  • Temperature: ${config.temperature}")
-            appendLine()
-            appendLine("🔧 自动调优: ${if (state.autoTuningEnabled) "已启用" else "已禁用"}")
-        }
-    }
-    
-    /**
-     * 格式化字节数
-     */
-    private fun formatBytes(bytes: Long): String {
-        return when {
-            bytes >= 1024L * 1024 * 1024 -> String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024))
-            bytes >= 1024L * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024))
-            else -> String.format("%.1f KB", bytes / 1024.0)
-        }
+        BALANCED,       // 均衡模式
+        PERFORMANCE,    // 性能优先
+        BATTERY_SAVER,  // 省电模式
+        QUALITY,        // 质量优先
+        GPU_ACCELERATED // GPU 加速模式
     }
 }

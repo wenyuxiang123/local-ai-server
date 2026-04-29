@@ -15,6 +15,7 @@ import com.localai.server.util.FileLog
 
 /**
  * HTTP 服务器，提供 OpenAI 兼容 API
+ * 支持返回 llama.cpp 优化配置信息
  */
 class AiHttpServer(
     private val engine: LlamaEngine,
@@ -47,8 +48,12 @@ class AiHttpServer(
                 handleChatCompletions(session)
             }
 
+            uri == "/v1/config" && method == Method.GET -> {
+                handleGetConfig()
+            }
+
             uri == "/health" && method == Method.GET -> {
-                jsonResponse("""{"status": "healthy"}""")
+                handleHealth()
             }
 
             else -> {
@@ -61,6 +66,43 @@ class AiHttpServer(
         }
     }
 
+    /**
+     * 健康检查端点 - 返回服务器状态和优化配置
+     */
+    private fun handleHealth(): Response {
+        val modelLoaded = engine.isModelLoaded()
+        val modelName = engine.getLoadedModelName()
+        val optConfig = engine.getOptimizationConfig()
+        
+        val health = JsonObject().apply {
+            addProperty("status", if (modelLoaded) "healthy" else "model_not_loaded")
+            addProperty("model_loaded", modelLoaded)
+            addProperty("model_name", modelName ?: "none")
+            addProperty("timestamp", System.currentTimeMillis() / 1000)
+        }
+        
+        return jsonResponse(gson.toJson(health))
+    }
+
+    /**
+     * 获取当前优化配置
+     */
+    private fun handleGetConfig(): Response {
+        val optConfig = engine.getOptimizationConfig()
+        val config = JsonObject().apply {
+            addProperty("n_ctx", optConfig.nCtx)
+            addProperty("n_threads", optConfig.nThreads)
+            addProperty("n_batch", optConfig.nBatch)
+            addProperty("flash_attn", optConfig.flashAttn)
+            addProperty("cache_type", optConfig.cacheType)
+            addProperty("n_gpu_layers", optConfig.nGpuLayers)
+            addProperty("backend", optConfig.backend)
+            addProperty("gpu_enabled", optConfig.nGpuLayers != 0)
+        }
+        
+        return jsonResponse(gson.toJson(config))
+    }
+
     private fun handleListModels(): Response {
         val modelName = engine.getLoadedModelName() ?: "unknown"
         val response = """
@@ -71,7 +113,12 @@ class AiHttpServer(
                         "id": "$modelName",
                         "object": "model",
                         "created": ${System.currentTimeMillis() / 1000},
-                        "owned_by": "local"
+                        "owned_by": "local",
+                        "optimization": {
+                            "flash_attn": ${engine.getOptimizationConfig().flashAttn},
+                            "cache_type": "${engine.getOptimizationConfig().cacheType}",
+                            "gpu_layers": ${engine.getOptimizationConfig().nGpuLayers}
+                        }
                     }
                 ]
             }
@@ -268,4 +315,18 @@ data class Usage(
     val prompt_tokens: Int,
     val completion_tokens: Int,
     val total_tokens: Int
+)
+
+/**
+ * 优化配置响应
+ */
+data class OptimizationConfigResponse(
+    val n_ctx: Int,
+    val n_threads: Int,
+    val n_batch: Int,
+    val flash_attn: Boolean,
+    val cache_type: String,
+    val n_gpu_layers: Int,
+    val backend: String,
+    val gpu_enabled: Boolean
 )

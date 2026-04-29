@@ -21,11 +21,20 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
     
+    - name: Clone llama.cpp
+      run: |
+        git clone https://github.com/ggml-org/llama.cpp.git ${GITHUB_WORKSPACE}/llama-cpp-src --depth 1 --single-branch
+        echo "llama.cpp cloned successfully"
+        ls -la ${GITHUB_WORKSPACE}/llama-cpp-src | head -20
+    
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     
     - name: Build Release APK
       run: ./gradlew assembleRelease --no-daemon
+      env:
+        # Pass llama.cpp source path to CMake via Gradle properties
+        LLAMA_CPP_SRC: ${{ github.workspace }}/llama-cpp-src
     
     - name: Upload unsigned APK
       uses: actions/upload-artifact@v4
