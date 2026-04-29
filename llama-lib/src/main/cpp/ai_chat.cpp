@@ -40,6 +40,12 @@ static common_chat_templates_ptr          g_chat_templates;
 static common_sampler                   * g_sampler;
 static int                                 g_n_ctx = DEFAULT_CONTEXT_SIZE;
 
+// 可配置的优化参数（默认值）
+static bool        g_flash_attn = true;
+static ggml_type   g_cache_type_k = GGML_TYPE_Q4_0;
+static ggml_type   g_cache_type_v = GGML_TYPE_Q4_0;
+static int         g_n_batch = BATCH_SIZE;
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_init(JNIEnv *env, jobject /*unused*/, jstring nativeLibDir) {
@@ -59,7 +65,36 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_init(JNIEnv *env, jobject /*unu
 
 extern "C"
 JNIEXPORT jint JNICALL
-Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstring jmodel_path, jint jn_ctx) {
+Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, 
+    jstring jmodel_path, 
+    jint jn_ctx,
+    jint jn_batch,          // 新增：批处理大小
+    jboolean jflash_attn,   // 新增：Flash Attention
+    jstring jcache_type     // 新增：KV cache 量化类型
+) {
+    // 解析新参数
+    g_n_batch = (jn_batch > 0) ? jn_batch : BATCH_SIZE;
+    g_flash_attn = jflash_attn;
+    
+    if (jcache_type != nullptr) {
+        const char* cache_str = env->GetStringUTFChars(jcache_type, 0);
+        if (strcmp(cache_str, "f16") == 0) {
+            g_cache_type_k = GGML_TYPE_F16;
+            g_cache_type_v = GGML_TYPE_F16;
+        } else if (strcmp(cache_str, "q8_0") == 0) {
+            g_cache_type_k = GGML_TYPE_Q8_0;
+            g_cache_type_v = GGML_TYPE_Q8_0;
+        } else if (strcmp(cache_str, "q5_0") == 0) {
+            g_cache_type_k = GGML_TYPE_Q5_0;
+            g_cache_type_v = GGML_TYPE_Q5_0;
+        } else {
+            // 默认 Q4_0
+            g_cache_type_k = GGML_TYPE_Q4_0;
+            g_cache_type_v = GGML_TYPE_Q4_0;
+        }
+        env->ReleaseStringUTFChars(jcache_type, cache_str);
+    }
+    
     llama_model_params model_params = llama_model_default_params();
     
     // 关闭 mmap，将模型全部加载到物理内存
@@ -71,7 +106,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstr
     const int n_ctx = (jn_ctx > 0) ? jn_ctx : DEFAULT_CONTEXT_SIZE;
     g_n_ctx = n_ctx;
     LOGd("%s: Loading model from: \n%s\n", __func__, model_path);
-    LOGi("%s: Full load into physical memory (mmap=off, n_ctx=%d)", __func__, n_ctx);
+    LOGi("%s: Full load into physical memory (mmap=off, n_ctx=%d, n_batch=%d, flash_attn=%d)", __func__, n_ctx, g_n_batch, g_flash_attn);
 
     auto *model = llama_model_load_from_file(model_path, model_params);
     env->ReleaseStringUTFChars(jmodel_path, model_path);
@@ -102,17 +137,19 @@ static llama_context *init_context(llama_model *model, const int n_ctx = DEFAULT
              __func__, trained_context_size, n_ctx);
     }
     ctx_params.n_ctx = n_ctx;
-    ctx_params.n_batch = BATCH_SIZE;
-    ctx_params.n_ubatch = BATCH_SIZE;
+    
+    // 批处理大小 - 使用全局变量
+    ctx_params.n_batch = g_n_batch;
+    ctx_params.n_ubatch = g_n_batch;
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
     
-    // Flash Attention - 显著加速上下文处理
-    ctx_params.flash_attn = true;
+    // Flash Attention - 使用全局变量
+    ctx_params.flash_attn = g_flash_attn;
     
-    // KV Cache 量化 - 节省约60%内存，质量损失极小
-    ctx_params.cache_type_k = GGML_TYPE_Q4_0;
-    ctx_params.cache_type_v = GGML_TYPE_Q4_0;
+    // KV Cache 量化 - 使用全局变量
+    ctx_params.cache_type_k = g_cache_type_k;
+    ctx_params.cache_type_v = g_cache_type_v;
     
     auto *context = llama_init_from_model(g_model, ctx_params);
     if (context == nullptr) {

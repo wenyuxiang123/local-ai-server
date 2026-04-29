@@ -83,7 +83,13 @@ internal class InferenceEngineImpl private constructor(
     private external fun init(nativeLibDir: String)
 
     @FastNative
-    private external fun load(modelPath: String, nCtx: Int): Int
+    private external fun load(
+        modelPath: String, 
+        nCtx: Int,
+        nBatch: Int = 512,
+        flashAttn: Boolean = true,
+        cacheType: String = "q4_0"
+    ): Int
 
     @FastNative
     private external fun prepare(): Int
@@ -147,8 +153,13 @@ internal class InferenceEngineImpl private constructor(
     /**
      * Load the LLM
      */
-    override suspend fun loadModel(pathToModel: String, nCtx: Int) =
-        withContext(llamaDispatcher) {
+    override suspend fun loadModel(
+        pathToModel: String, 
+        nCtx: Int,
+        nBatch: Int,
+        flashAttn: Boolean,
+        cacheType: String
+    ) = withContext(llamaDispatcher) {
             check(_state.value is InferenceEngine.State.Initialized) {
                 "Cannot load model in ${_state.value.javaClass.simpleName}!"
             }
@@ -161,10 +172,10 @@ internal class InferenceEngineImpl private constructor(
                     require(it.canRead()) { "Cannot read file" }
                 }
 
-                Log.i(TAG, "Loading model... \n$pathToModel")
+                Log.i(TAG, "Loading model... \n$pathToModel, nBatch=$nBatch, flashAttn=$flashAttn, cacheType=$cacheType")
                 _readyForSystemPrompt = false
                 _state.value = InferenceEngine.State.LoadingModel
-                load(pathToModel, nCtx).let {
+                load(pathToModel, nCtx, nBatch, flashAttn, cacheType).let {
                     // TODO-han.yin: find a better way to pass other error codes
                     if (it != 0) throw UnsupportedArchitectureException()
                 }

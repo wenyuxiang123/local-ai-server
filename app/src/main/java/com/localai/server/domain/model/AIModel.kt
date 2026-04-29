@@ -1,11 +1,24 @@
 package com.localai.server.domain.model
 
+/**
+ * 优化参数配置
+ * @param nBatch 批处理大小，默认 512
+ * @param flashAttn 是否启用 Flash Attention，默认 true
+ * @param cacheType KV cache 量化类型: f16/q4_0/q5_0/q8_0，默认 q4_0
+ */
+data class OptimizationParams(
+    val nBatch: Int = 512,
+    val flashAttn: Boolean = true,
+    val cacheType: String = "q4_0"
+)
+
 data class ModelConfig(
     val name: String,
     val path: String,
     val contextSize: Int = 2048,
     val threads: Int = 4,
-    val sizeBytes: Long = 0
+    val sizeBytes: Long = 0,
+    val optimizationParams: OptimizationParams? = null
 )
 
 data class GenerateConfig(

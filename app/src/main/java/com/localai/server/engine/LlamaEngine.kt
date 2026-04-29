@@ -108,8 +108,21 @@ class LlamaEngine @Inject constructor(
     
     /**
      * 加载模型
+     * @param path 模型文件路径
+     * @param nCtx 上下文大小
+     * @param nThreads 线程数
+     * @param nBatch 批处理大小 (默认: 512)
+     * @param flashAttn 是否启用 Flash Attention (默认: true)
+     * @param cacheType KV cache 量化类型: f16/q4_0/q5_0/q8_0 (默认: q4_0)
      */
-    suspend fun loadModel(path: String, nCtx: Int = 2048, nThreads: Int = 4): Boolean = withContext(Dispatchers.IO) {
+    suspend fun loadModel(
+        path: String, 
+        nCtx: Int = 2048, 
+        nThreads: Int = 4,
+        nBatch: Int = 512,
+        flashAttn: Boolean = true,
+        cacheType: String = "q4_0"
+    ): Boolean = withContext(Dispatchers.IO) {
         val file = File(path)
         if (!file.exists()) {
             Log.e(TAG, "Model file not found: $path")
@@ -145,11 +158,11 @@ class LlamaEngine @Inject constructor(
             }
             
             Log.i(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB")
-            FileLog.log(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB, nCtx=$nCtx, nThreads=$nThreads")
-            Log.i(TAG, "Context size: $nCtx, Threads: $nThreads")
+            FileLog.log(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB, nCtx=$nCtx, nThreads=$nThreads, nBatch=$nBatch, flashAttn=$flashAttn, cacheType=$cacheType")
+            Log.i(TAG, "Context size: $nCtx, Threads: $nThreads, nBatch: $nBatch, flashAttn: $flashAttn, cacheType: $cacheType")
             
-            // 使用官方 API 加载模型，传入上下文大小
-            engine.loadModel(path, nCtx)
+            // 使用官方 API 加载模型，传入上下文大小和优化参数
+            engine.loadModel(path, nCtx, nBatch, flashAttn, cacheType)
             
             // 如果之前有设置过 system prompt，重新设置
             if (_systemPrompt.isNotEmpty()) {
@@ -300,6 +313,30 @@ class LlamaEngine @Inject constructor(
     }
     
     fun getLoadedModelName(): String? = loadedModelName
+    
+    /**
+     * 获取当前优化配置
+     * @return OptimizationParams 当前使用的优化参数
+     */
+    fun getOptimizationConfig(): com.localai.server.domain.model.OptimizationParams? {
+        if (!isModelLoaded) return null
+        // 从内存信息动态计算当前配置
+        val memInfo = android.app.ActivityManager.MemoryInfo()
+        (context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).getMemoryInfo(memInfo)
+        val availMemMB = memInfo.availMem / 1024 / 1024
+        
+        val nBatch = when {
+            availMemMB > 8000 -> 1024
+            availMemMB > 4000 -> 512
+            else -> 256
+        }
+        
+        return com.localai.server.domain.model.OptimizationParams(
+            nBatch = nBatch,
+            flashAttn = true,
+            cacheType = "q4_0"
+        )
+    }
     
     fun getMemoryUsage(): Long {
         if (!isModelLoaded) return 0

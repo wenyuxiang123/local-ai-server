@@ -1,5 +1,6 @@
 package com.localai.server.data.repository
 
+import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -172,9 +173,28 @@ class AIRepositoryImpl @Inject constructor(
                 else -> cores.coerceIn(2, 4)
             }
             
-            // 加载模型 - 4B 模型使用动态上下文大小
-            val contextSize = 2048  // 默认值，后续可从ParameterTuner获取
-            val success = engine.loadModel(path, contextSize, threads)
+            // 根据设备内存动态调整批处理大小
+            val memInfo = ActivityManager.MemoryInfo()
+            (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memInfo)
+            val availMemMB = memInfo.availMem / 1024 / 1024
+            
+            val nBatch = when {
+                availMemMB > 8000 -> 1024  // 8GB+ 可用，大批次
+                availMemMB > 4000 -> 512   // 4-8GB，中等
+                else -> 256                 // <4GB，小批次
+            }
+            
+            // 加载模型 - 4B 模型使用动态上下文大小和优化参数
+            val contextSize = 2048
+            Log.i(TAG, "Loading with optimization: nBatch=$nBatch, threads=$threads, availMem=${availMemMB}MB")
+            val success = engine.loadModel(
+                path = path, 
+                nCtx = contextSize, 
+                nThreads = threads,
+                nBatch = nBatch,
+                flashAttn = true,    // 默认开启 Flash Attention
+                cacheType = "q4_0"   // 默认 Q4_0 量化
+            )
             
             if (success) {
                 // 更新 AIService 的模型加载状态
@@ -184,7 +204,12 @@ class AIRepositoryImpl @Inject constructor(
                     name = file.nameWithoutExtension,
                     path = path,
                     threads = threads,
-                    sizeBytes = file.length()
+                    sizeBytes = file.length(),
+                    optimizationParams = com.localai.server.domain.model.OptimizationParams(
+                        nBatch = nBatch,
+                        flashAttn = true,
+                        cacheType = "q4_0"
+                    )
                 )
                 Result.success(config)
             } else {

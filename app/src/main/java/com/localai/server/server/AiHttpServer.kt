@@ -47,6 +47,10 @@ class AiHttpServer(
                 handleChatCompletions(session)
             }
 
+            uri == "/v1/config" && method == Method.GET -> {
+                handleGetConfig()
+            }
+
             uri == "/health" && method == Method.GET -> {
                 jsonResponse("""{"status": "healthy"}""")
             }
@@ -74,6 +78,29 @@ class AiHttpServer(
                         "owned_by": "local"
                     }
                 ]
+            }
+        """.trimIndent()
+        return jsonResponse(response)
+    }
+
+    /**
+     * 返回当前优化配置
+     */
+    private fun handleGetConfig(): Response {
+        // 从优化参数获取当前配置（如果有）
+        val modelLoaded = engine.isModelLoaded()
+        val config = engine.getOptimizationConfig()
+        
+        val response = """
+            {
+                "model_loaded": $modelLoaded,
+                "optimization": {
+                    "n_batch": ${config?.nBatch ?: 512},
+                    "flash_attn": ${config?.flashAttn ?: true},
+                    "cache_type": "${config?.cacheType ?: "q4_0"}"
+                },
+                "supported_cache_types": ["f16", "q4_0", "q5_0", "q8_0"],
+                "available_n_batch_options": [256, 512, 1024]
             }
         """.trimIndent()
         return jsonResponse(response)
