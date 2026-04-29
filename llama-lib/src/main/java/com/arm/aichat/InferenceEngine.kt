@@ -67,6 +67,11 @@ interface InferenceEngine {
     fun getOptimizationInfo(): String
 
     /**
+     * Test if Vulkan GPU backend is available
+     */
+    fun testVulkanSupport(): Boolean
+
+    /**
      * States of the inference engine
      */
     sealed class State {

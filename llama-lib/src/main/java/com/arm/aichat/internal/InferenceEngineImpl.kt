@@ -104,6 +104,9 @@ internal class InferenceEngineImpl private constructor(
     private external fun nativeGetOptimizationInfo(): String
 
     @FastNative
+    private external fun nativeTestVulkan(): Int
+
+    @FastNative
     private external fun benchModel(pp: Int, tg: Int, pl: Int, nr: Int): String
 
     @FastNative
@@ -351,6 +354,19 @@ internal class InferenceEngineImpl private constructor(
             }
         }
         llamaScope.cancel()
+    }
+
+    /**
+     * Test if Vulkan GPU backend is available
+     * Returns true if Vulkan is functional, false otherwise
+     */
+    fun testVulkanSupport(): Boolean {
+        return try {
+            nativeTestVulkan() > 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Vulkan test failed", e)
+            false
+        }
     }
 
     /**

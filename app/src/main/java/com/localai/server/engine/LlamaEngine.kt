@@ -38,6 +38,9 @@ class LlamaEngine @Inject constructor(
 ) {
     companion object {
         private const val TAG = "LlamaEngine"
+        private const val PREFS_NAME = "llama_engine_prefs"
+        private const val KEY_VULKAN_STATUS = "vulkan_status"  // "ok", "fail", "testing", "unknown"
+        private const val KEY_VULKAN_TESTED = "vulkan_tested"
         
         private var _instance: LlamaEngine? = null
         private var _engine: InferenceEngine? = null
@@ -121,6 +124,71 @@ class LlamaEngine @Inject constructor(
      * @param cacheType KV cache 量化类型: "f16", "q8_0", "q4_0", "q5_0", "q5_1" (默认: "f16")
      * @param nGpuLayers GPU 卸载层数 (0=纯CPU, -1=全部, >0=指定层数) (默认: 0)
      */
+    /**
+     * Test Vulkan support safely with crash recovery
+     * Returns true if Vulkan is available and functional
+     */
+    fun testVulkanSupport(): Boolean {
+        // Check crash recovery: if last test left status as "testing", it crashed
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastStatus = prefs.getString(KEY_VULKAN_STATUS, "unknown")
+        
+        if (lastStatus == "testing") {
+            // Last Vulkan test caused a crash
+            Log.w(TAG, "Vulkan test crashed last time, marking as unsupported")
+            prefs.edit().putString(KEY_VULKAN_STATUS, "fail").apply()
+            return false
+        }
+        
+        if (lastStatus == "fail") {
+            Log.i(TAG, "Vulkan previously marked as unsupported")
+            return false
+        }
+        
+        if (lastStatus == "ok") {
+            Log.i(TAG, "Vulkan previously tested OK")
+            return _engine?.testVulkanSupport() ?: false
+        }
+        
+        // First time: test with crash recovery
+        return try {
+            prefs.edit().putString(KEY_VULKAN_STATUS, "testing").apply()
+            val result = _engine?.testVulkanSupport() ?: false
+            prefs.edit().putString(KEY_VULKAN_STATUS, if (result) "ok" else "fail").apply()
+            Log.i(TAG, "Vulkan test result: $result")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Vulkan test exception", e)
+            prefs.edit().putString(KEY_VULKAN_STATUS, "fail").apply()
+            false
+        }
+    }
+    
+    /**
+     * Reset Vulkan status (allow re-testing)
+     */
+    fun resetVulkanStatus() {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_VULKAN_STATUS, "unknown").apply()
+    }
+    
+    /**
+     * Check if GPU offload is safe to enable
+     * Automatically downgrades to CPU if Vulkan is not available
+     */
+    fun safeGpuLayers(requestedLayers: Int): Int {
+        if (requestedLayers == 0) return 0  // CPU mode, no check needed
+        
+        val vulkanOk = testVulkanSupport()
+        if (!vulkanOk) {
+            Log.w(TAG, "Vulkan not available, GPU offload disabled (requested: $requestedLayers)")
+            return 0
+        }
+        
+        Log.i(TAG, "Vulkan available, GPU offload enabled: $requestedLayers layers")
+        return requestedLayers
+    }
+
     suspend fun loadModel(
         path: String,
         nCtx: Int = 2048,
@@ -167,10 +235,17 @@ class LlamaEngine @Inject constructor(
             Log.i(TAG, "Loading model with llama.cpp optimizations:")
             Log.i(TAG, "  Model: ${file.name}, size=${file.length() / 1024 / 1024}MB")
             Log.i(TAG, "  nCtx: $nCtx, nThreads: $nThreads, nBatch: $nBatch")
-            Log.i(TAG, "  flashAttn: $flashAttn, cacheType: $cacheType, nGpuLayers: $nGpuLayers")
+            // 安全检测GPU：如果Vulkan不可用则自动降级为CPU
+            val actualGpuLayers = safeGpuLayers(nGpuLayers)
+            if (actualGpuLayers != nGpuLayers) {
+                Log.w(TAG, "GPU offload downgraded: $nGpuLayers -> $actualGpuLayers (Vulkan not available)")
+                FileLog.log(TAG, "WARNING: GPU offload downgraded: $nGpuLayers -> $actualGpuLayers")
+            }
+            
+            Log.i(TAG, "  flashAttn: $flashAttn, cacheType: $cacheType, nGpuLayers: $actualGpuLayers")
             FileLog.log(TAG, "Loading model: ${file.name}")
             FileLog.log(TAG, "Optimizations: nCtx=$nCtx, nThreads=$nThreads, nBatch=$nBatch")
-            FileLog.log(TAG, "flashAttn=$flashAttn, cacheType=$cacheType, nGpuLayers=$nGpuLayers")
+            FileLog.log(TAG, "flashAttn=$flashAttn, cacheType=$cacheType, nGpuLayers=$actualGpuLayers")
             
             // 使用官方 API 加载模型，传入全部优化参数
             engine.loadModel(
@@ -180,17 +255,17 @@ class LlamaEngine @Inject constructor(
                 nBatch = nBatch,
                 flashAttn = flashAttn,
                 cacheType = cacheType,
-                nGpuLayers = nGpuLayers
+                nGpuLayers = actualGpuLayers
             )
             
-            // 更新当前优化配置
+            // 更新当前优化配置（使用实际GPU层数）
             _currentOptimization = OptimizationConfig(
                 nCtx = nCtx,
                 nThreads = nThreads,
                 nBatch = nBatch,
                 flashAttn = flashAttn,
                 cacheType = cacheType,
-                nGpuLayers = nGpuLayers
+                nGpuLayers = actualGpuLayers
             )
             
             // 如果之前有设置过 system prompt，重新设置

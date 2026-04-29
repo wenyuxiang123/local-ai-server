@@ -240,6 +240,54 @@ static std::string get_backend() {
 }
 
 /**
+ * Test if Vulkan backend is available and functional
+ * This is a lightweight test that doesn't load any model
+ * Returns: 0 = not available, 1 = available, -1 = error
+ */
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_arm_aichat_internal_InferenceEngineImpl_nativeTestVulkan(JNIEnv *env, jobject /*unused*/) {
+    try {
+        // Check if Vulkan backend is registered
+        bool vulkan_found = false;
+        for (size_t i = 0; i < ggml_backend_reg_count(); i++) {
+            auto *reg = ggml_backend_reg_get(i);
+            std::string name = ggml_backend_reg_name(reg);
+            if (name == "Vulkan" || name == "VULKAN" || name == "vulkan") {
+                vulkan_found = true;
+                LOGi("Vulkan backend found in registry");
+                
+                // Try to get device count
+                auto get_device_count_fn = (size_t (*)(void))ggml_backend_reg_get_proc_address(reg, "ggml_backend_vk_get_device_count");
+                if (get_device_count_fn) {
+                    size_t device_count = get_device_count_fn();
+                    LOGi("Vulkan device count: %zu", device_count);
+                    if (device_count == 0) {
+                        LOGi("Vulkan registered but no devices found");
+                        return 0;
+                    }
+                    return 1;
+                } else {
+                    // Backend exists but can't query device count - assume available
+                    LOGi("Vulkan backend found but no device count API - assuming available");
+                    return 1;
+                }
+                break;
+            }
+        }
+        
+        if (!vulkan_found) {
+            LOGi("Vulkan backend not found in registry");
+        }
+        return 0;
+    } catch (...) {
+        LOGe("Exception during Vulkan test");
+        return -1;
+    }
+}
+
+
+/**
  * Get optimization info as JSON string
  */
 extern "C"
