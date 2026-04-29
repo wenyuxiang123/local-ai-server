@@ -20,6 +20,7 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import java.io.File
+import com.localai.server.optimizer.ParameterTuner
 import javax.inject.Singleton
 
 @Module
@@ -61,9 +62,10 @@ object RepositoryModule {
     fun provideAIRepository(
         context: Context,
         engine: LlamaEngine,
-        modelExtractor: ModelExtractor
+        modelExtractor: ModelExtractor,
+        parameterTuner: ParameterTuner
     ): AIRepository {
-        return AIRepositoryImpl(context, engine, modelExtractor)
+        return AIRepositoryImpl(context, engine, modelExtractor, parameterTuner)
     }
 }
 
