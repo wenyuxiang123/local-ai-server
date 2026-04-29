@@ -360,7 +360,7 @@ internal class InferenceEngineImpl private constructor(
      * Test if Vulkan GPU backend is available
      * Returns true if Vulkan is functional, false otherwise
      */
-    fun testVulkanSupport(): Boolean {
+    override fun testVulkanSupport(): Boolean {
         return try {
             nativeTestVulkan() > 0
         } catch (e: Exception) {

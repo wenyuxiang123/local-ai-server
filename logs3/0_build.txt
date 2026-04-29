@@ -1,0 +1,341 @@
+﻿2026-04-29T08:24:56.9717523Z Current runner version: '2.334.0'
+2026-04-29T08:24:56.9740981Z ##[group]Runner Image Provisioner
+2026-04-29T08:24:56.9741668Z Hosted Compute Agent
+2026-04-29T08:24:56.9742306Z Version: 20260213.493
+2026-04-29T08:24:56.9742842Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-04-29T08:24:56.9743417Z Build Date: 2026-02-13T00:28:41Z
+2026-04-29T08:24:56.9744097Z Worker ID: {8f344d60-69e5-42dc-ab05-1a087aef2081}
+2026-04-29T08:24:56.9744694Z Azure Region: westcentralus
+2026-04-29T08:24:56.9745401Z ##[endgroup]
+2026-04-29T08:24:56.9746777Z ##[group]Operating System
+2026-04-29T08:24:56.9747314Z Ubuntu
+2026-04-29T08:24:56.9747700Z 24.04.4
+2026-04-29T08:24:56.9748181Z LTS
+2026-04-29T08:24:56.9748589Z ##[endgroup]
+2026-04-29T08:24:56.9748992Z ##[group]Runner Image
+2026-04-29T08:24:56.9749582Z Image: ubuntu-24.04
+2026-04-29T08:24:56.9750016Z Version: 20260413.86.1
+2026-04-29T08:24:56.9751108Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260413.86/images/ubuntu/Ubuntu2404-Readme.md
+2026-04-29T08:24:56.9752382Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260413.86
+2026-04-29T08:24:56.9753138Z ##[endgroup]
+2026-04-29T08:24:56.9754110Z ##[group]GITHUB_TOKEN Permissions
+2026-04-29T08:24:56.9756258Z Contents: read
+2026-04-29T08:24:56.9756810Z Metadata: read
+2026-04-29T08:24:56.9757242Z Packages: read
+2026-04-29T08:24:56.9757696Z ##[endgroup]
+2026-04-29T08:24:56.9759936Z Secret source: Actions
+2026-04-29T08:24:56.9760695Z Prepare workflow directory
+2026-04-29T08:24:57.0088229Z Prepare all required actions
+2026-04-29T08:24:57.0128779Z Getting action download info
+2026-04-29T08:24:57.5676716Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-04-29T08:24:57.6937576Z Download action repository 'actions/setup-java@v4' (SHA:c1e323688fd81a25caa38c78aa6df2d33d3e20d9)
+2026-04-29T08:24:58.7740904Z Download action repository 'gradle/actions@v3' (SHA:d9c87d481d55275bb5441eef3fe0e46805f9ef70)
+2026-04-29T08:25:00.3573903Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-04-29T08:25:00.5525733Z Complete job name: build
+2026-04-29T08:25:00.6270335Z ##[group]Run actions/checkout@v4
+2026-04-29T08:25:00.6270910Z with:
+2026-04-29T08:25:00.6271194Z   repository: wenyuxiang123/local-ai-server
+2026-04-29T08:25:00.6271799Z   token: ***
+2026-04-29T08:25:00.6272027Z   ssh-strict: true
+2026-04-29T08:25:00.6272274Z   ssh-user: git
+2026-04-29T08:25:00.6272507Z   persist-credentials: true
+2026-04-29T08:25:00.6272784Z   clean: true
+2026-04-29T08:25:00.6273026Z   sparse-checkout-cone-mode: true
+2026-04-29T08:25:00.6273313Z   fetch-depth: 1
+2026-04-29T08:25:00.6273545Z   fetch-tags: false
+2026-04-29T08:25:00.6273788Z   show-progress: true
+2026-04-29T08:25:00.6274049Z   lfs: false
+2026-04-29T08:25:00.6274261Z   submodules: false
+2026-04-29T08:25:00.6274501Z   set-safe-directory: true
+2026-04-29T08:25:00.6275200Z ##[endgroup]
+2026-04-29T08:25:00.7355880Z Syncing repository: wenyuxiang123/local-ai-server
+2026-04-29T08:25:00.7358353Z ##[group]Getting Git version info
+2026-04-29T08:25:00.7359242Z Working directory is '/home/runner/work/local-ai-server/local-ai-server'
+2026-04-29T08:25:00.7360516Z [command]/usr/bin/git version
+2026-04-29T08:25:00.7384044Z git version 2.53.0
+2026-04-29T08:25:00.7408045Z ##[endgroup]
+2026-04-29T08:25:00.7430814Z Temporarily overriding HOME='/home/runner/work/_temp/4ead320c-2e1a-4054-a8e1-6bfa1944904d' before making global git config changes
+2026-04-29T08:25:00.7432248Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-29T08:25:00.7437549Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/local-ai-server/local-ai-server
+2026-04-29T08:25:00.7466569Z Deleting the contents of '/home/runner/work/local-ai-server/local-ai-server'
+2026-04-29T08:25:00.7469795Z ##[group]Initializing the repository
+2026-04-29T08:25:00.7474105Z [command]/usr/bin/git init /home/runner/work/local-ai-server/local-ai-server
+2026-04-29T08:25:00.7559387Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-04-29T08:25:00.7560385Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-04-29T08:25:00.7561258Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-04-29T08:25:00.7562065Z hint: call:
+2026-04-29T08:25:00.7562708Z hint:
+2026-04-29T08:25:00.7563231Z hint: 	git config --global init.defaultBranch <name>
+2026-04-29T08:25:00.7563792Z hint:
+2026-04-29T08:25:00.7564333Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-04-29T08:25:00.7565377Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-04-29T08:25:00.7566003Z hint:
+2026-04-29T08:25:00.7566365Z hint: 	git branch -m <name>
+2026-04-29T08:25:00.7566744Z hint:
+2026-04-29T08:25:00.7567316Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-04-29T08:25:00.7568363Z Initialized empty Git repository in /home/runner/work/local-ai-server/local-ai-server/.git/
+2026-04-29T08:25:00.7573825Z [command]/usr/bin/git remote add origin https://github.com/wenyuxiang123/local-ai-server
+2026-04-29T08:25:00.7602023Z ##[endgroup]
+2026-04-29T08:25:00.7602506Z ##[group]Disabling automatic garbage collection
+2026-04-29T08:25:00.7606527Z [command]/usr/bin/git config --local gc.auto 0
+2026-04-29T08:25:00.7631000Z ##[endgroup]
+2026-04-29T08:25:00.7631428Z ##[group]Setting up auth
+2026-04-29T08:25:00.7637767Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-29T08:25:00.7663320Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-29T08:25:00.7909362Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-29T08:25:00.7933325Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-29T08:25:00.8108587Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-29T08:25:00.8138617Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-29T08:25:00.8319258Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-04-29T08:25:00.8349476Z ##[endgroup]
+2026-04-29T08:25:00.8350279Z ##[group]Fetching the repository
+2026-04-29T08:25:00.8358529Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +42702dd47e67002b14c8fe3607100e3e941b82ea:refs/remotes/origin/main
+2026-04-29T08:25:06.5739972Z From https://github.com/wenyuxiang123/local-ai-server
+2026-04-29T08:25:06.5740917Z  * [new ref]         42702dd47e67002b14c8fe3607100e3e941b82ea -> origin/main
+2026-04-29T08:25:06.5766024Z ##[endgroup]
+2026-04-29T08:25:06.5766844Z ##[group]Determining the checkout info
+2026-04-29T08:25:06.5768165Z ##[endgroup]
+2026-04-29T08:25:06.5775367Z [command]/usr/bin/git sparse-checkout disable
+2026-04-29T08:25:06.5849405Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-04-29T08:25:06.6167218Z ##[group]Checking out the ref
+2026-04-29T08:25:06.6173587Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-04-29T08:25:07.2664233Z Switched to a new branch 'main'
+2026-04-29T08:25:07.2665148Z branch 'main' set up to track 'origin/main'.
+2026-04-29T08:25:07.2686691Z ##[endgroup]
+2026-04-29T08:25:07.2723526Z [command]/usr/bin/git log -1 --format=%H
+2026-04-29T08:25:07.2743187Z 42702dd47e67002b14c8fe3607100e3e941b82ea
+2026-04-29T08:25:07.2970363Z ##[group]Run actions/setup-java@v4
+2026-04-29T08:25:07.2970665Z with:
+2026-04-29T08:25:07.2970846Z   java-version: 17
+2026-04-29T08:25:07.2971047Z   distribution: temurin
+2026-04-29T08:25:07.2971389Z   java-package: jdk
+2026-04-29T08:25:07.2971600Z   check-latest: false
+2026-04-29T08:25:07.2971788Z   server-id: github
+2026-04-29T08:25:07.2971988Z   server-username: GITHUB_ACTOR
+2026-04-29T08:25:07.2972222Z   server-password: GITHUB_TOKEN
+2026-04-29T08:25:07.2972458Z   overwrite-settings: true
+2026-04-29T08:25:07.2972670Z   job-status: success
+2026-04-29T08:25:07.2973037Z   token: ***
+2026-04-29T08:25:07.2973226Z ##[endgroup]
+2026-04-29T08:25:07.4893155Z ##[group]Installed distributions
+2026-04-29T08:25:07.4952339Z Resolved Java 17.0.18+8 from tool-cache
+2026-04-29T08:25:07.4952964Z Setting Java 17.0.18+8 as the default
+2026-04-29T08:25:07.4965518Z Creating toolchains.xml for JDK version 17 from temurin
+2026-04-29T08:25:07.5034503Z Writing to /home/runner/.m2/toolchains.xml
+2026-04-29T08:25:07.5035133Z 
+2026-04-29T08:25:07.5035291Z Java configuration:
+2026-04-29T08:25:07.5035996Z   Distribution: temurin
+2026-04-29T08:25:07.5036409Z   Version: 17.0.18+8
+2026-04-29T08:25:07.5037185Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:07.5037794Z 
+2026-04-29T08:25:07.5038417Z ##[endgroup]
+2026-04-29T08:25:07.5056595Z Creating settings.xml with server-id: github
+2026-04-29T08:25:07.5058273Z Writing to /home/runner/.m2/settings.xml
+2026-04-29T08:25:07.5265473Z ##[group]Run gradle/actions/setup-gradle@v3
+2026-04-29T08:25:07.5265762Z with:
+2026-04-29T08:25:07.5265956Z   cache-disabled: false
+2026-04-29T08:25:07.5266174Z   cache-read-only: false
+2026-04-29T08:25:07.5266396Z   cache-write-only: false
+2026-04-29T08:25:07.5266619Z   cache-overwrite-existing: false
+2026-04-29T08:25:07.5266921Z   gradle-home-cache-includes: caches
+notifications
+
+2026-04-29T08:25:07.5267242Z   gradle-home-cache-cleanup: false
+2026-04-29T08:25:07.5267481Z   add-job-summary: always
+2026-04-29T08:25:07.5267715Z   add-job-summary-as-pr-comment: never
+2026-04-29T08:25:07.5267976Z   dependency-graph: disabled
+2026-04-29T08:25:07.5268240Z   dependency-graph-continue-on-failure: true
+2026-04-29T08:25:07.5268519Z   build-scan-publish: false
+2026-04-29T08:25:07.5268749Z   validate-wrappers: false
+2026-04-29T08:25:07.5268963Z   generate-job-summary: true
+2026-04-29T08:25:07.5269207Z   gradle-home-cache-strict-match: false
+2026-04-29T08:25:07.5269508Z   workflow-job-context: null
+2026-04-29T08:25:07.5269925Z   github-token: ***
+2026-04-29T08:25:07.5270105Z env:
+2026-04-29T08:25:07.5270377Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:07.5270819Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:07.5271164Z ##[endgroup]
+2026-04-29T08:25:07.9056923Z Merged default JDK locations into /home/runner/.m2/toolchains.xml
+2026-04-29T08:25:07.9059312Z ##[group]Restore Gradle state from cache
+2026-04-29T08:25:08.0355887Z ##[warning]Failed to restore gradle-home-v1|Linux|build[620c74083efa5b88ef904c2356f72d31]-42702dd47e67002b14c8fe3607100e3e941b82ea: Error: Cache service responded with 400
+2026-04-29T08:25:08.0422400Z Gradle User Home cache not found. Will initialize empty.
+2026-04-29T08:25:08.0423297Z ##[endgroup]
+2026-04-29T08:25:08.0523253Z ##[group]Run git clone https://github.com/ggml-org/llama.cpp.git ${GITHUB_WORKSPACE}/llama-cpp-src --depth 1 --single-branch
+2026-04-29T08:25:08.0524312Z [36;1mgit clone https://github.com/ggml-org/llama.cpp.git ${GITHUB_WORKSPACE}/llama-cpp-src --depth 1 --single-branch[0m
+2026-04-29T08:25:08.0525184Z [36;1mecho "llama.cpp cloned successfully"[0m
+2026-04-29T08:25:08.0525519Z [36;1mls -la ${GITHUB_WORKSPACE}/llama-cpp-src | head -20[0m
+2026-04-29T08:25:08.0541537Z shell: /usr/bin/bash -e {0}
+2026-04-29T08:25:08.0541789Z env:
+2026-04-29T08:25:08.0542085Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:08.0542535Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:08.0542929Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-04-29T08:25:08.0543210Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-04-29T08:25:08.0543662Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-04-29T08:25:08.0544124Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-04-29T08:25:08.0544585Z   DEVELOCITY_AUTO_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-04-29T08:25:08.0545039Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-04-29T08:25:08.0545277Z ##[endgroup]
+2026-04-29T08:25:08.0612249Z Cloning into '/home/runner/work/local-ai-server/local-ai-server/llama-cpp-src'...
+2026-04-29T08:25:11.0806909Z llama.cpp cloned successfully
+2026-04-29T08:25:11.0828111Z total 1208
+2026-04-29T08:25:11.0828589Z drwxr-xr-x 27 runner runner   4096 Apr 29 08:25 .
+2026-04-29T08:25:11.0829174Z drwxr-xr-x  8 runner runner   4096 Apr 29 08:25 ..
+2026-04-29T08:25:11.0829816Z -rw-r--r--  1 runner runner   4961 Apr 29 08:25 .clang-format
+2026-04-29T08:25:11.0830555Z -rw-r--r--  1 runner runner    931 Apr 29 08:25 .clang-tidy
+2026-04-29T08:25:11.0831303Z drwxr-xr-x  3 runner runner   4096 Apr 29 08:25 .devops
+2026-04-29T08:25:11.0831993Z -rw-r--r--  1 runner runner    237 Apr 29 08:25 .dockerignore
+2026-04-29T08:25:11.0832568Z -rw-r--r--  1 runner runner     97 Apr 29 08:25 .ecrc
+2026-04-29T08:25:11.0833079Z -rw-r--r--  1 runner runner   1392 Apr 29 08:25 .editorconfig
+2026-04-29T08:25:11.0833639Z -rw-r--r--  1 runner runner    565 Apr 29 08:25 .flake8
+2026-04-29T08:25:11.0834216Z drwxr-xr-x  2 runner runner   4096 Apr 29 08:25 .gemini
+2026-04-29T08:25:11.0834658Z drwxr-xr-x  7 runner runner   4096 Apr 29 08:25 .git
+2026-04-29T08:25:11.0835247Z -rw-r--r--  1 runner runner    259 Apr 29 08:25 .gitattributes
+2026-04-29T08:25:11.0835643Z drwxr-xr-x  5 runner runner   4096 Apr 29 08:25 .github
+2026-04-29T08:25:11.0836054Z -rw-r--r--  1 runner runner   1846 Apr 29 08:25 .gitignore
+2026-04-29T08:25:11.0836442Z -rw-r--r--  1 runner runner      0 Apr 29 08:25 .gitmodules
+2026-04-29T08:25:11.0836833Z drwxr-xr-x  3 runner runner   4096 Apr 29 08:25 .pi
+2026-04-29T08:25:11.0837267Z -rw-r--r--  1 runner runner    447 Apr 29 08:25 .pre-commit-config.yaml
+2026-04-29T08:25:11.0837729Z -rw-r--r--  1 runner runner   6857 Apr 29 08:25 AGENTS.md
+2026-04-29T08:25:11.0838106Z -rw-r--r--  1 runner runner  65818 Apr 29 08:25 AUTHORS
+2026-04-29T08:25:11.0864391Z ##[group]Run chmod +x gradlew
+2026-04-29T08:25:11.0864660Z [36;1mchmod +x gradlew[0m
+2026-04-29T08:25:11.0877599Z shell: /usr/bin/bash -e {0}
+2026-04-29T08:25:11.0877830Z env:
+2026-04-29T08:25:11.0878119Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:11.0878579Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:11.0878968Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-04-29T08:25:11.0879256Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-04-29T08:25:11.0879529Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-04-29T08:25:11.0879937Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-04-29T08:25:11.0880398Z   DEVELOCITY_AUTO_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-04-29T08:25:11.0880717Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-04-29T08:25:11.0880950Z ##[endgroup]
+2026-04-29T08:25:11.0967530Z ##[group]Run ./gradlew assembleRelease --no-daemon
+2026-04-29T08:25:11.0967884Z [36;1m./gradlew assembleRelease --no-daemon[0m
+2026-04-29T08:25:11.0980438Z shell: /usr/bin/bash -e {0}
+2026-04-29T08:25:11.0980668Z env:
+2026-04-29T08:25:11.0980951Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:11.0981413Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:11.0981798Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-04-29T08:25:11.0982077Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-04-29T08:25:11.0982345Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-04-29T08:25:11.0982737Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-04-29T08:25:11.0983202Z   DEVELOCITY_AUTO_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-04-29T08:25:11.0983657Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-04-29T08:25:11.0984084Z   LLAMA_CPP_SRC: /home/runner/work/local-ai-server/local-ai-server/llama-cpp-src
+2026-04-29T08:25:11.0984438Z ##[endgroup]
+2026-04-29T08:25:11.7540883Z Downloading https://services.gradle.org/distributions/gradle-8.2-bin.zip
+2026-04-29T08:25:14.5710186Z ............10%............20%............30%.............40%............50%............60%............70%.............80%............90%............100%
+2026-04-29T08:25:15.6529871Z 
+2026-04-29T08:25:15.6530559Z Welcome to Gradle 8.2!
+2026-04-29T08:25:15.6531391Z 
+2026-04-29T08:25:15.6532737Z Here are the highlights of this release:
+2026-04-29T08:25:15.6535584Z  - Kotlin DSL: new reference documentation, assignment syntax by default
+2026-04-29T08:25:15.6541300Z  - Kotlin DSL is now the default with Gradle init
+2026-04-29T08:25:15.6541922Z  - Improved suggestions to resolve errors in console output
+2026-04-29T08:25:15.6542279Z 
+2026-04-29T08:25:15.6542481Z For more details see https://docs.gradle.org/8.2/release-notes.html
+2026-04-29T08:25:15.6542770Z 
+2026-04-29T08:25:15.8526778Z To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+2026-04-29T08:25:16.8522571Z Daemon will be stopped at the end of the build 
+2026-04-29T08:25:59.5548103Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_17_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5550479Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_21_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5560135Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_25_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5561883Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_11_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5563492Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_8_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:26:00.4560379Z > Task :app:buildKotlinToolingMetadata
+2026-04-29T08:26:00.5523917Z > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-04-29T08:26:00.5525344Z > Task :app:preBuild UP-TO-DATE
+2026-04-29T08:26:00.5525887Z > Task :app:preReleaseBuild UP-TO-DATE
+2026-04-29T08:26:14.5526198Z > Task :app:dataBindingMergeDependencyArtifactsRelease
+2026-04-29T08:26:14.5527235Z > Task :app:generateReleaseResValues
+2026-04-29T08:26:14.5527679Z > Task :app:generateReleaseResources
+2026-04-29T08:26:14.5528115Z > Task :llama-lib:preBuild UP-TO-DATE
+2026-04-29T08:26:14.5528676Z > Task :llama-lib:preReleaseBuild UP-TO-DATE
+2026-04-29T08:26:14.5529074Z > Task :llama-lib:generateReleaseResValues
+2026-04-29T08:26:14.5529527Z > Task :llama-lib:generateReleaseResources
+2026-04-29T08:26:14.7545734Z > Task :llama-lib:packageReleaseResources
+2026-04-29T08:26:16.9525814Z > Task :app:packageReleaseResources
+2026-04-29T08:26:17.1522458Z > Task :app:mergeReleaseResources
+2026-04-29T08:26:17.6550171Z > Task :llama-lib:writeReleaseAarMetadata
+2026-04-29T08:26:17.7523626Z > Task :llama-lib:parseReleaseLocalResources
+2026-04-29T08:26:17.7549603Z > Task :app:parseReleaseLocalResources
+2026-04-29T08:26:17.7575692Z > Task :llama-lib:processReleaseManifest
+2026-04-29T08:26:17.8523119Z > Task :app:checkReleaseAarMetadata
+2026-04-29T08:26:17.8564974Z > Task :app:mapReleaseSourceSetPaths
+2026-04-29T08:26:17.8585025Z > Task :app:createReleaseCompatibleScreenManifests
+2026-04-29T08:26:17.8605832Z > Task :app:extractDeepLinksRelease
+2026-04-29T08:26:17.8606565Z > Task :llama-lib:generateReleaseRFile
+2026-04-29T08:26:17.8607246Z > Task :llama-lib:extractDeepLinksRelease
+2026-04-29T08:26:18.2531931Z > Task :app:dataBindingGenBaseClassesRelease
+2026-04-29T08:26:18.4548642Z > Task :app:processReleaseMainManifest
+2026-04-29T08:26:18.5522856Z > Task :app:processReleaseManifest
+2026-04-29T08:26:19.0522989Z > Task :llama-lib:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-04-29T08:26:19.0524168Z > Task :llama-lib:compileReleaseLibraryResources
+2026-04-29T08:26:24.0586000Z > Task :app:processReleaseManifestForPackage
+2026-04-29T08:26:24.6522780Z > Task :llama-lib:javaPreCompileRelease
+2026-04-29T08:26:25.6522230Z > Task :app:processReleaseResources
+2026-04-29T08:26:29.6522989Z > Task :app:extractProguardFiles
+2026-04-29T08:26:29.6545857Z > Task :app:javaPreCompileRelease
+2026-04-29T08:26:30.2527060Z 
+2026-04-29T08:26:30.2527665Z > Task :llama-lib:compileReleaseKotlin FAILED
+2026-04-29T08:26:30.2531317Z w: Flag is not supported by this version of the compiler: -Xno-exception-assertions
+2026-04-29T08:26:30.2537060Z e: file:///home/runner/work/local-ai-server/local-ai-server/llama-lib/src/main/java/com/arm/aichat/internal/InferenceEngineImpl.kt:363:9 'testVulkanSupport' hides member of supertype 'InferenceEngine' and needs an 'override' modifier.
+2026-04-29T08:26:30.3525397Z 
+2026-04-29T08:26:30.3525420Z 
+2026-04-29T08:26:30.3535654Z > Task :llama-lib:mergeReleaseJniLibFolders
+2026-04-29T08:26:30.3545638Z FAILURE: Build failed with an exception.
+2026-04-29T08:26:30.3577127Z 
+2026-04-29T08:26:30.3577457Z 28 actionable tasks: 28 executed
+2026-04-29T08:26:30.3605438Z * What went wrong:
+2026-04-29T08:26:30.3635637Z Execution failed for task ':llama-lib:compileReleaseKotlin'.
+2026-04-29T08:26:30.3656168Z > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+2026-04-29T08:26:30.3666468Z    > Compilation error. See log for more details
+2026-04-29T08:26:30.3697423Z 
+2026-04-29T08:26:30.3725376Z * Try:
+2026-04-29T08:26:30.3725862Z > Run with --stacktrace option to get the stack trace.
+2026-04-29T08:26:30.3755601Z > Run with --info or --debug option to get more log output.
+2026-04-29T08:26:30.3775609Z > Run with --scan to get full insights.
+2026-04-29T08:26:30.3777186Z > Get more help at https://help.gradle.org.
+2026-04-29T08:26:30.3777666Z 
+2026-04-29T08:26:30.3777935Z BUILD FAILED in 1m 19s
+2026-04-29T08:26:30.8048744Z ##[error]Process completed with exit code 1.
+2026-04-29T08:26:30.8221952Z Post job cleanup.
+2026-04-29T08:26:31.0653059Z In post-action step
+2026-04-29T08:26:31.0661249Z Stopping all Gradle daemons before saving Gradle User Home state
+2026-04-29T08:26:31.0662433Z Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta/gradle-8.2
+2026-04-29T08:26:31.0680750Z [command]/home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta/gradle-8.2/bin/gradle --stop
+2026-04-29T08:26:31.8114517Z No Gradle daemons are running.
+2026-04-29T08:26:31.8299393Z ##[group]Caching Gradle state
+2026-04-29T08:26:31.8568680Z Caching wrapper-zips with path '/home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta' and cache key: gradle-wrapper-zips-v1-d75ab2e302ad9e0b00dcd53244709342
+2026-04-29T08:26:31.8716922Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T08:26:32.2500797Z Caching dependencies with path '/home/runner/.gradle/caches/modules-*/files-*/*/*/*/*' and cache key: gradle-dependencies-v1-cb2f4ccd14071ab45c366db67bb12463
+2026-04-29T08:26:32.3006953Z Caching instrumented-jars with path '/home/runner/.gradle/caches/jars-*/*/' and cache key: gradle-instrumented-jars-v1-60aa80fd15d9c6a99ad02fe2b0ed7b8a
+2026-04-29T08:26:32.3834375Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T08:26:32.5304582Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta' and key: gradle-wrapper-zips-v1-d75ab2e302ad9e0b00dcd53244709342: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0uMDxaQAAAAD83BlpSHIBT5IAWsvw4zJHREVOMzAxMDAwMTA2MDMxAEVkZ2U=
+2026-04-29T08:26:32.7588566Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T08:26:33.7797343Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/caches/modules-*/files-*/*/*/*/*' and key: gradle-dependencies-v1-cb2f4ccd14071ab45c366db67bb12463: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0ucDxaQAAAACI08v1usZfQ6K/T+lQcsu1REVOMzAxMDAwMTAzMDUxAEVkZ2U=
+2026-04-29T08:26:33.8609630Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/caches/jars-*/*/' and key: gradle-instrumented-jars-v1-60aa80fd15d9c6a99ad02fe2b0ed7b8a: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0ucDxaQAAAACeSHSqHpjERY9+7eLjHfjrREVOMzAxMDAwMTAzMDE3AEVkZ2U=
+2026-04-29T08:26:33.9151769Z Caching Gradle User Home with cache key: gradle-home-v1|Linux|build[620c74083efa5b88ef904c2356f72d31]-42702dd47e67002b14c8fe3607100e3e941b82ea
+2026-04-29T08:26:33.9235457Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T08:26:34.1879973Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/caches,/home/runner/.gradle/notifications,/home/runner/.gradle/.setup-gradle' and key: gradle-home-v1|Linux|build[620c74083efa5b88ef904c2356f72d31]-42702dd47e67002b14c8fe3607100e3e941b82ea: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0usDxaQAAAABVC9+0cp7AQKbQYrVBJwomREVOMzAxMDAwMTAzMDUzAEVkZ2U=
+2026-04-29T08:26:34.1883625Z ##[endgroup]
+2026-04-29T08:26:34.1883916Z Generating Job Summary
+2026-04-29T08:26:34.1897157Z Completed post-action step
+2026-04-29T08:26:34.2033269Z Post job cleanup.
+2026-04-29T08:26:34.3704008Z Post job cleanup.
+2026-04-29T08:26:34.4637175Z [command]/usr/bin/git version
+2026-04-29T08:26:34.4670414Z git version 2.53.0
+2026-04-29T08:26:34.4709995Z Temporarily overriding HOME='/home/runner/work/_temp/a78a76ac-a6e4-41e3-a84e-834b08042b57' before making global git config changes
+2026-04-29T08:26:34.4710831Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-29T08:26:34.4715701Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/local-ai-server/local-ai-server
+2026-04-29T08:26:34.4749696Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-29T08:26:34.4778805Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-29T08:26:34.4961792Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-29T08:26:34.4980014Z http.https://github.com/.extraheader
+2026-04-29T08:26:34.4990847Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-04-29T08:26:34.5017181Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-29T08:26:34.5189421Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-29T08:26:34.5216469Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-29T08:26:34.5513962Z Cleaning up orphan processes
+2026-04-29T08:26:34.5758479Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-java@v4, gradle/actions/setup-gradle@v3. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,90 @@
+﻿2026-04-29T08:25:11.0967517Z ##[group]Run ./gradlew assembleRelease --no-daemon
+2026-04-29T08:25:11.0967881Z [36;1m./gradlew assembleRelease --no-daemon[0m
+2026-04-29T08:25:11.0980431Z shell: /usr/bin/bash -e {0}
+2026-04-29T08:25:11.0980665Z env:
+2026-04-29T08:25:11.0980947Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:11.0981411Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:11.0981796Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-04-29T08:25:11.0982075Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-04-29T08:25:11.0982342Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-04-29T08:25:11.0982734Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-04-29T08:25:11.0983199Z   DEVELOCITY_AUTO_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-04-29T08:25:11.0983654Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-04-29T08:25:11.0984024Z   LLAMA_CPP_SRC: /home/runner/work/local-ai-server/local-ai-server/llama-cpp-src
+2026-04-29T08:25:11.0984435Z ##[endgroup]
+2026-04-29T08:25:11.7540847Z Downloading https://services.gradle.org/distributions/gradle-8.2-bin.zip
+2026-04-29T08:25:14.5710141Z ............10%............20%............30%.............40%............50%............60%............70%.............80%............90%............100%
+2026-04-29T08:25:15.6529819Z 
+2026-04-29T08:25:15.6530550Z Welcome to Gradle 8.2!
+2026-04-29T08:25:15.6531348Z 
+2026-04-29T08:25:15.6532712Z Here are the highlights of this release:
+2026-04-29T08:25:15.6535567Z  - Kotlin DSL: new reference documentation, assignment syntax by default
+2026-04-29T08:25:15.6541276Z  - Kotlin DSL is now the default with Gradle init
+2026-04-29T08:25:15.6541914Z  - Improved suggestions to resolve errors in console output
+2026-04-29T08:25:15.6542275Z 
+2026-04-29T08:25:15.6542478Z For more details see https://docs.gradle.org/8.2/release-notes.html
+2026-04-29T08:25:15.6542767Z 
+2026-04-29T08:25:15.8526680Z To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+2026-04-29T08:25:16.8522531Z Daemon will be stopped at the end of the build 
+2026-04-29T08:25:59.5548055Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_17_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5550464Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_21_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5560115Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_25_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5561852Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_11_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:25:59.5563455Z Directory '/home/runner/.gradle/daemon/8.2/${env.JAVA_HOME_8_X64}' (Maven Toolchains) used for java installations does not exist
+2026-04-29T08:26:00.4560320Z > Task :app:buildKotlinToolingMetadata
+2026-04-29T08:26:00.5523874Z > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-04-29T08:26:00.5525307Z > Task :app:preBuild UP-TO-DATE
+2026-04-29T08:26:00.5525882Z > Task :app:preReleaseBuild UP-TO-DATE
+2026-04-29T08:26:14.5526147Z > Task :app:dataBindingMergeDependencyArtifactsRelease
+2026-04-29T08:26:14.5527226Z > Task :app:generateReleaseResValues
+2026-04-29T08:26:14.5527675Z > Task :app:generateReleaseResources
+2026-04-29T08:26:14.5528111Z > Task :llama-lib:preBuild UP-TO-DATE
+2026-04-29T08:26:14.5528669Z > Task :llama-lib:preReleaseBuild UP-TO-DATE
+2026-04-29T08:26:14.5529071Z > Task :llama-lib:generateReleaseResValues
+2026-04-29T08:26:14.5529523Z > Task :llama-lib:generateReleaseResources
+2026-04-29T08:26:14.7545688Z > Task :llama-lib:packageReleaseResources
+2026-04-29T08:26:16.9525763Z > Task :app:packageReleaseResources
+2026-04-29T08:26:17.1521903Z > Task :app:mergeReleaseResources
+2026-04-29T08:26:17.6550128Z > Task :llama-lib:writeReleaseAarMetadata
+2026-04-29T08:26:17.7523584Z > Task :llama-lib:parseReleaseLocalResources
+2026-04-29T08:26:17.7549573Z > Task :app:parseReleaseLocalResources
+2026-04-29T08:26:17.7575663Z > Task :llama-lib:processReleaseManifest
+2026-04-29T08:26:17.8523071Z > Task :app:checkReleaseAarMetadata
+2026-04-29T08:26:17.8564935Z > Task :app:mapReleaseSourceSetPaths
+2026-04-29T08:26:17.8584996Z > Task :app:createReleaseCompatibleScreenManifests
+2026-04-29T08:26:17.8605805Z > Task :app:extractDeepLinksRelease
+2026-04-29T08:26:17.8606557Z > Task :llama-lib:generateReleaseRFile
+2026-04-29T08:26:17.8607240Z > Task :llama-lib:extractDeepLinksRelease
+2026-04-29T08:26:18.2531889Z > Task :app:dataBindingGenBaseClassesRelease
+2026-04-29T08:26:18.4548594Z > Task :app:processReleaseMainManifest
+2026-04-29T08:26:18.5522815Z > Task :app:processReleaseManifest
+2026-04-29T08:26:19.0522900Z > Task :llama-lib:checkKotlinGradlePluginConfigurationErrors SKIPPED
+2026-04-29T08:26:19.0524160Z > Task :llama-lib:compileReleaseLibraryResources
+2026-04-29T08:26:24.0585948Z > Task :app:processReleaseManifestForPackage
+2026-04-29T08:26:24.6522738Z > Task :llama-lib:javaPreCompileRelease
+2026-04-29T08:26:25.6522181Z > Task :app:processReleaseResources
+2026-04-29T08:26:29.6522937Z > Task :app:extractProguardFiles
+2026-04-29T08:26:29.6545832Z > Task :app:javaPreCompileRelease
+2026-04-29T08:26:30.2527015Z 
+2026-04-29T08:26:30.2527658Z > Task :llama-lib:compileReleaseKotlin FAILED
+2026-04-29T08:26:30.2531311Z w: Flag is not supported by this version of the compiler: -Xno-exception-assertions
+2026-04-29T08:26:30.2537048Z e: file:///home/runner/work/local-ai-server/local-ai-server/llama-lib/src/main/java/com/arm/aichat/internal/InferenceEngineImpl.kt:363:9 'testVulkanSupport' hides member of supertype 'InferenceEngine' and needs an 'override' modifier.
+2026-04-29T08:26:30.3525346Z 
+2026-04-29T08:26:30.3525415Z 
+2026-04-29T08:26:30.3535595Z > Task :llama-lib:mergeReleaseJniLibFolders
+2026-04-29T08:26:30.3545622Z FAILURE: Build failed with an exception.
+2026-04-29T08:26:30.3577104Z 
+2026-04-29T08:26:30.3577451Z 28 actionable tasks: 28 executed
+2026-04-29T08:26:30.3605419Z * What went wrong:
+2026-04-29T08:26:30.3635619Z Execution failed for task ':llama-lib:compileReleaseKotlin'.
+2026-04-29T08:26:30.3656146Z > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+2026-04-29T08:26:30.3666451Z    > Compilation error. See log for more details
+2026-04-29T08:26:30.3697403Z 
+2026-04-29T08:26:30.3725355Z * Try:
+2026-04-29T08:26:30.3725855Z > Run with --stacktrace option to get the stack trace.
+2026-04-29T08:26:30.3755581Z > Run with --info or --debug option to get more log output.
+2026-04-29T08:26:30.3775584Z > Run with --scan to get full insights.
+2026-04-29T08:26:30.3777174Z > Get more help at https://help.gradle.org.
+2026-04-29T08:26:30.3777659Z 
+2026-04-29T08:26:30.3777930Z BUILD FAILED in 1m 19s
+2026-04-29T08:26:30.8048698Z ##[error]Process completed with exit code 1.

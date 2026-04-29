@@ -1,0 +1,37 @@
+﻿2026-04-29T08:25:08.0523234Z ##[group]Run git clone https://github.com/ggml-org/llama.cpp.git ${GITHUB_WORKSPACE}/llama-cpp-src --depth 1 --single-branch
+2026-04-29T08:25:08.0524307Z [36;1mgit clone https://github.com/ggml-org/llama.cpp.git ${GITHUB_WORKSPACE}/llama-cpp-src --depth 1 --single-branch[0m
+2026-04-29T08:25:08.0525180Z [36;1mecho "llama.cpp cloned successfully"[0m
+2026-04-29T08:25:08.0525514Z [36;1mls -la ${GITHUB_WORKSPACE}/llama-cpp-src | head -20[0m
+2026-04-29T08:25:08.0541517Z shell: /usr/bin/bash -e {0}
+2026-04-29T08:25:08.0541786Z env:
+2026-04-29T08:25:08.0542081Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:08.0542531Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.18-8/x64
+2026-04-29T08:25:08.0542925Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-04-29T08:25:08.0543206Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-04-29T08:25:08.0543659Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-04-29T08:25:08.0544058Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-04-29T08:25:08.0544582Z   DEVELOCITY_AUTO_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-04-29T08:25:08.0545036Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-04-29T08:25:08.0545274Z ##[endgroup]
+2026-04-29T08:25:08.0612217Z Cloning into '/home/runner/work/local-ai-server/local-ai-server/llama-cpp-src'...
+2026-04-29T08:25:11.0806863Z llama.cpp cloned successfully
+2026-04-29T08:25:11.0828082Z total 1208
+2026-04-29T08:25:11.0828582Z drwxr-xr-x 27 runner runner   4096 Apr 29 08:25 .
+2026-04-29T08:25:11.0829168Z drwxr-xr-x  8 runner runner   4096 Apr 29 08:25 ..
+2026-04-29T08:25:11.0829793Z -rw-r--r--  1 runner runner   4961 Apr 29 08:25 .clang-format
+2026-04-29T08:25:11.0830550Z -rw-r--r--  1 runner runner    931 Apr 29 08:25 .clang-tidy
+2026-04-29T08:25:11.0831297Z drwxr-xr-x  3 runner runner   4096 Apr 29 08:25 .devops
+2026-04-29T08:25:11.0831988Z -rw-r--r--  1 runner runner    237 Apr 29 08:25 .dockerignore
+2026-04-29T08:25:11.0832546Z -rw-r--r--  1 runner runner     97 Apr 29 08:25 .ecrc
+2026-04-29T08:25:11.0833075Z -rw-r--r--  1 runner runner   1392 Apr 29 08:25 .editorconfig
+2026-04-29T08:25:11.0833635Z -rw-r--r--  1 runner runner    565 Apr 29 08:25 .flake8
+2026-04-29T08:25:11.0834212Z drwxr-xr-x  2 runner runner   4096 Apr 29 08:25 .gemini
+2026-04-29T08:25:11.0834654Z drwxr-xr-x  7 runner runner   4096 Apr 29 08:25 .git
+2026-04-29T08:25:11.0835244Z -rw-r--r--  1 runner runner    259 Apr 29 08:25 .gitattributes
+2026-04-29T08:25:11.0835640Z drwxr-xr-x  5 runner runner   4096 Apr 29 08:25 .github
+2026-04-29T08:25:11.0836051Z -rw-r--r--  1 runner runner   1846 Apr 29 08:25 .gitignore
+2026-04-29T08:25:11.0836439Z -rw-r--r--  1 runner runner      0 Apr 29 08:25 .gitmodules
+2026-04-29T08:25:11.0836829Z drwxr-xr-x  3 runner runner   4096 Apr 29 08:25 .pi
+2026-04-29T08:25:11.0837263Z -rw-r--r--  1 runner runner    447 Apr 29 08:25 .pre-commit-config.yaml
+2026-04-29T08:25:11.0837716Z -rw-r--r--  1 runner runner   6857 Apr 29 08:25 AGENTS.md
+2026-04-29T08:25:11.0838103Z -rw-r--r--  1 runner runner  65818 Apr 29 08:25 AUTHORS
