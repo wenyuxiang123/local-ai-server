@@ -410,6 +410,51 @@
 
                 </LinearLayout>
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="GPU 层数:"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_gpu_layers"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekbar_gpu_layers"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:max="99"
+                        android:progress="0" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="设为0使用CPU，设高值启用Vulkan GPU加速"
+                        android:textSize="10sp"
+                        android:textColor="@android:color/darker_gray" />
+
+                </LinearLayout>
+
                 <Button
                     android:id="@+id/btn_apply_config"
                     android:layout_width="match_parent"

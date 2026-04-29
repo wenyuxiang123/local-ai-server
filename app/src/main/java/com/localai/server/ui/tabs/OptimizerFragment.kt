@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -95,8 +96,31 @@ class OptimizerFragment : Fragment() {
 
         // 应用配置
         binding.btnApplyConfig.setOnClickListener {
+            // 保存 GPU 层数配置
+            val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+            prefs.edit().putInt("n_gpu_layers", binding.seekbarGpuLayers.progress).apply()
             Toast.makeText(requireContext(), "配置已应用", Toast.LENGTH_SHORT).show()
         }
+
+        // GPU 层数配置
+        binding.seekbarGpuLayers.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                binding.tvGpuLayers.text = progress.toString()
+                if (fromUser) {
+                    // 实时保存到 SharedPreferences
+                    val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putInt("n_gpu_layers", progress).apply()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        // 从 SharedPreferences 读取初始值
+        val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+        val savedGpuLayers = prefs.getInt("n_gpu_layers", 0)
+        binding.seekbarGpuLayers.progress = savedGpuLayers
+        binding.tvGpuLayers.text = savedGpuLayers.toString()
 
         // 生成补丁
         binding.btnGeneratePatches.setOnClickListener {
@@ -186,12 +210,17 @@ class OptimizerFragment : Fragment() {
     }
 
     private fun updateConfigUI() {
+        // 从 SharedPreferences 读取配置
+        val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+        
         // TODO: 重新实现配置显示
         // 当前暂时显示默认值
         binding.tvThreads.text = "4"
         binding.tvContextSize.text = "2048"
         binding.tvBatchSize.text = "512"
         binding.tvTemperature.text = "0.7"
+        binding.tvGpuLayers.text = prefs.getInt("n_gpu_layers", 0).toString()
+        binding.seekbarGpuLayers.progress = prefs.getInt("n_gpu_layers", 0)
     }
 
     private fun generatePatches() {

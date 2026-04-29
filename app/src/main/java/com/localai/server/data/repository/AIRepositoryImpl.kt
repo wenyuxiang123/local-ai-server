@@ -187,6 +187,10 @@ class AIRepositoryImpl @Inject constructor(
             // 加载模型 - 4B 模型使用动态上下文大小和优化参数
             val contextSize = 2048
             Log.i(TAG, "Loading with optimization: nBatch=$nBatch, threads=$threads, availMem=${availMemMB}MB")
+            
+            val nGpuLayers = context.getSharedPreferences("ai_config", Context.MODE_PRIVATE)
+                .getInt("n_gpu_layers", 0)
+            
             val success = engine.loadModel(
                 path = path, 
                 nCtx = contextSize, 
@@ -194,7 +198,7 @@ class AIRepositoryImpl @Inject constructor(
                 nBatch = nBatch,
                 flashAttn = true,
                 cacheType = "f16",
-                nGpuLayers = 0    // 默认CPU，需手动开启GPU
+                nGpuLayers = nGpuLayers
             )
             
             if (success) {

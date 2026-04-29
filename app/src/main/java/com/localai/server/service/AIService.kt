@@ -126,7 +126,8 @@ class AIService : Service() {
                 val path = intent.getStringExtra(EXTRA_MODEL_PATH)
                 val nCtx = intent.getIntExtra(EXTRA_N_CTX, 2048)
                 val nThreads = intent.getIntExtra(EXTRA_N_THREADS, 4)
-                path?.let { loadModelInternal(it, nCtx, nThreads) }
+                val nGpuLayers = intent.getIntExtra(EXTRA_N_GPU_LAYERS, 0)
+                path?.let { loadModelInternal(it, nCtx, nThreads, nGpuLayers) }
             }
         }
         
