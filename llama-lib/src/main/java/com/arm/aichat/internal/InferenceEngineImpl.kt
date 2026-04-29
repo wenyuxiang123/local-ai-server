@@ -101,7 +101,7 @@ internal class InferenceEngineImpl private constructor(
     private external fun systemInfo(): String
 
     @FastNative
-    private external fun getOptimizationInfo(): String
+    private external fun nativeGetOptimizationInfo(): String
 
     @FastNative
     private external fun benchModel(pp: Int, tg: Int, pl: Int, nr: Int): String
@@ -202,7 +202,7 @@ internal class InferenceEngineImpl private constructor(
             }
             
             Log.i(TAG, "Model loaded successfully!")
-            Log.i(TAG, "Optimization info: ${getOptimizationInfo()}")
+            Log.i(TAG, "Optimization info: ${nativeGetOptimizationInfo()}")
             
             _readyForSystemPrompt = true
             _cancelGeneration = false
@@ -358,7 +358,7 @@ internal class InferenceEngineImpl private constructor(
      */
     override fun getOptimizationInfo(): String {
         return try {
-            getOptimizationInfo()
+            nativeGetOptimizationInfo()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get optimization info", e)
             "{}"

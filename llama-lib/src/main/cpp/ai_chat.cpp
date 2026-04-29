@@ -244,7 +244,7 @@ static std::string get_backend() {
  */
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_arm_aichat_internal_InferenceEngineImpl_getOptimizationInfo(JNIEnv *env, jobject /*unused*/) {
+Java_com_arm_aichat_internal_InferenceEngineImpl_nativeGetOptimizationInfo(JNIEnv *env, jobject /*unused*/) {
     std::stringstream info;
     info << "{";
     info << "\"n_ctx\":" << g_n_ctx << ",";
