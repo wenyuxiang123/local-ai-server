@@ -186,13 +186,13 @@ class AIService : Service() {
         }
     }
     
-    private fun loadModelInternal(path: String, nCtx: Int, nThreads: Int) {
+    private fun loadModelInternal(path: String, nCtx: Int, nThreads: Int, nGpuLayers: Int = 0) {
         serviceScope.launch {
             updateNotification("正在加载模型...")
             _errorMessage.value = null
             
             val success = withContext(Dispatchers.Default) {
-                engine.loadModel(path, nCtx, nThreads)
+                engine.loadModel(path, nCtx, nThreads, nBatch = 512, flashAttn = true, cacheType = "f16", nGpuLayers = nGpuLayers)
             }
             
             if (success) {
