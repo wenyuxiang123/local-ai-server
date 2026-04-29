@@ -88,7 +88,8 @@ internal class InferenceEngineImpl private constructor(
         nCtx: Int,
         nBatch: Int = 512,
         flashAttn: Boolean = true,
-        cacheType: String = "q4_0"
+        cacheType: String = "f16",
+        nGpuLayers: Int = 0
     ): Int
 
     @FastNative
@@ -158,7 +159,8 @@ internal class InferenceEngineImpl private constructor(
         nCtx: Int,
         nBatch: Int,
         flashAttn: Boolean,
-        cacheType: String
+        cacheType: String,
+        nGpuLayers: Int
     ) = withContext(llamaDispatcher) {
             check(_state.value is InferenceEngine.State.Initialized) {
                 "Cannot load model in ${_state.value.javaClass.simpleName}!"
@@ -172,11 +174,10 @@ internal class InferenceEngineImpl private constructor(
                     require(it.canRead()) { "Cannot read file" }
                 }
 
-                Log.i(TAG, "Loading model... \n$pathToModel, nBatch=$nBatch, flashAttn=$flashAttn, cacheType=$cacheType")
+                Log.i(TAG, "Loading model... \n$pathToModel, nBatch=$nBatch, flashAttn=$flashAttn, cacheType=$cacheType, nGpuLayers=$nGpuLayers")
                 _readyForSystemPrompt = false
                 _state.value = InferenceEngine.State.LoadingModel
-                load(pathToModel, nCtx, nBatch, flashAttn, cacheType).let {
-                    // TODO-han.yin: find a better way to pass other error codes
+                load(pathToModel, nCtx, nBatch, flashAttn, cacheType, nGpuLayers).let {
                     if (it != 0) throw UnsupportedArchitectureException()
                 }
                 prepare().let {

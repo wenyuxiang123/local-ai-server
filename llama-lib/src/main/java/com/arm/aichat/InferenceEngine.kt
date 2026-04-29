@@ -28,7 +28,8 @@ interface InferenceEngine {
         nCtx: Int = 2048,
         nBatch: Int = 512,
         flashAttn: Boolean = true,
-        cacheType: String = "q4_0"
+        cacheType: String = "f16",
+        nGpuLayers: Int = 0
     )
 
     /**

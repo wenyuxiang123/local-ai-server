@@ -21,6 +21,11 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
     
+    - name: Install Vulkan SDK
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libvulkan-dev vulkan-tools
+    
     - name: Clone llama.cpp
       run: |
         git clone https://github.com/ggml-org/llama.cpp.git ${GITHUB_WORKSPACE}/llama-cpp-src

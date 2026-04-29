@@ -192,8 +192,9 @@ class AIRepositoryImpl @Inject constructor(
                 nCtx = contextSize, 
                 nThreads = threads,
                 nBatch = nBatch,
-                flashAttn = true,    // 默认开启 Flash Attention
-                cacheType = "f16"    // CPU上f16比Q4_0快，避免反量化开销
+                flashAttn = true,
+                cacheType = "f16",
+                nGpuLayers = 0    // 默认CPU，需手动开启GPU
             )
             
             if (success) {

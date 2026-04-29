@@ -45,6 +45,7 @@ static bool        g_flash_attn = true;
 static ggml_type   g_cache_type_k = GGML_TYPE_F16;
 static ggml_type   g_cache_type_v = GGML_TYPE_F16;
 static int         g_n_batch = BATCH_SIZE;
+static int         g_n_gpu_layers = 0;
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -68,13 +69,15 @@ JNIEXPORT jint JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, 
     jstring jmodel_path, 
     jint jn_ctx,
-    jint jn_batch,          // 新增：批处理大小
-    jboolean jflash_attn,   // 新增：Flash Attention
-    jstring jcache_type     // 新增：KV cache 量化类型
+    jint jn_batch,
+    jboolean jflash_attn,
+    jstring jcache_type,
+    jint jn_gpu_layers
 ) {
-    // 解析新参数
+    // 解析优化参数
     g_n_batch = (jn_batch > 0) ? jn_batch : BATCH_SIZE;
     g_flash_attn = jflash_attn;
+    g_n_gpu_layers = jn_gpu_layers;
     
     if (jcache_type != nullptr) {
         const char* cache_str = env->GetStringUTFChars(jcache_type, 0);
@@ -88,7 +91,6 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject,
             g_cache_type_k = GGML_TYPE_Q5_0;
             g_cache_type_v = GGML_TYPE_Q5_0;
         } else {
-            // 默认 Q4_0
             g_cache_type_k = GGML_TYPE_Q4_0;
             g_cache_type_v = GGML_TYPE_Q4_0;
         }
@@ -96,6 +98,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject,
     }
     
     llama_model_params model_params = llama_model_default_params();
+    model_params.n_gpu_layers = g_n_gpu_layers;
     
     // 关闭 mmap，将模型全部加载到物理内存
     // 避免推理时缺页中断导致卡顿

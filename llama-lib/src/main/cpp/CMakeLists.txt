@@ -23,7 +23,7 @@ if(DEFINED ANDROID_ABI)
         set(GGML_OPENMP ON)
         # Vulkan disabled by default - causes crash on some devices during backend init
         # Enable only if device is confirmed Vulkan-compatible
-        set(GGML_VULKAN OFF)
+        set(GGML_VULKAN ON)
         message(STATUS "Vulkan GPU offload disabled (CPU-only build)")
     elseif(ANDROID_ABI STREQUAL "x86_64")
         set(GGML_SYSTEM_ARCH "x86")
