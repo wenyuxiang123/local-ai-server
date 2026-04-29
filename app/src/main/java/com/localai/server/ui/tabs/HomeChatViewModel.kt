@@ -61,6 +61,10 @@ class HomeChatViewModel @Inject constructor(
     private val _webSearchEnabled = MutableStateFlow(false)
     val webSearchEnabled: StateFlow<Boolean> = _webSearchEnabled.asStateFlow()
 
+    // 思考模式开关
+    private val _thinkModeEnabled = MutableStateFlow(false)
+    val thinkModeEnabled: StateFlow<Boolean> = _thinkModeEnabled.asStateFlow()
+
     // 当前附件
     private val _attachment = MutableStateFlow<Attachment?>(null)
     val attachment: StateFlow<Attachment?> = _attachment.asStateFlow()
@@ -93,6 +97,20 @@ class HomeChatViewModel @Inject constructor(
      */
     fun setWebSearchEnabled(enabled: Boolean) {
         _webSearchEnabled.value = enabled
+    }
+
+    /**
+     * 切换思考模式
+     */
+    fun toggleThinkMode() {
+        _thinkModeEnabled.value = !_thinkModeEnabled.value
+    }
+
+    /**
+     * 设置思考模式
+     */
+    fun setThinkModeEnabled(enabled: Boolean) {
+        _thinkModeEnabled.value = enabled
     }
 
     /**
@@ -371,6 +389,7 @@ class HomeChatViewModel @Inject constructor(
             }
 
             // 构建带搜索上下文的系统提示
+            val thinkTag = if (_thinkModeEnabled.value) " /think" else " /no_think"
             val systemPrompt = if (searchContext.isNotEmpty()) {
                 """
                 You are a helpful AI assistant. Please answer the user's question based on the search results provided below.
@@ -383,9 +402,10 @@ class HomeChatViewModel @Inject constructor(
                 - Answer in the same language as the user's question
                 - If you use information from the search results, mention the source at the end
                 - Be concise but informative
+                $thinkTag
                 """.trimIndent()
             } else {
-                "You are a helpful AI assistant."
+                "You are a helpful AI assistant.$thinkTag"
             }
 
             // Build messages
@@ -453,7 +473,7 @@ class HomeChatViewModel @Inject constructor(
         }
 
         // Build messages with system prompt
-        val allMessages = chatApiService.buildMessages(content, historyMessages)
+        val allMessages = chatApiService.buildMessages(content, historyMessages, _thinkModeEnabled.value)
 
         // Call AI API
         chatApiService.sendMessage(baseUrl, allMessages)

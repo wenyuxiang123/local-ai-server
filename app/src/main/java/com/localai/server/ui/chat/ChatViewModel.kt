@@ -35,7 +35,11 @@ class ChatViewModel @Inject constructor(
     // Selected conversation ID
     private val _currentConversationId = MutableStateFlow<Long?>(null)
     val currentConversationId: StateFlow<Long?> = _currentConversationId.asStateFlow()
-    
+
+    // 思考模式开关
+    private val _thinkModeEnabled = MutableStateFlow(false)
+    val thinkModeEnabled: StateFlow<Boolean> = _thinkModeEnabled.asStateFlow()
+
     // Effects for one-time events
     private val _effect = MutableSharedFlow<ChatEffect>()
     val effect: SharedFlow<ChatEffect> = _effect
@@ -107,6 +111,20 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * 切换思考模式
+     */
+    fun toggleThinkMode() {
+        _thinkModeEnabled.value = !_thinkModeEnabled.value
+    }
+
+    /**
+     * 设置思考模式
+     */
+    fun setThinkModeEnabled(enabled: Boolean) {
+        _thinkModeEnabled.value = enabled
+    }
     
     /**
      * Rename conversation
@@ -149,7 +167,7 @@ class ChatViewModel @Inject constructor(
                 }
                 
                 // Build messages with system prompt
-                val allMessages = chatApiService.buildMessages(content, historyMessages)
+                val allMessages = chatApiService.buildMessages(content, historyMessages, _thinkModeEnabled.value)
                 
                 // Call AI API
                 chatApiService.sendMessage(baseUrl, allMessages)

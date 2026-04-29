@@ -143,6 +143,10 @@ class AiHttpServer(
             Log.i(TAG, "Generated response: ${generatedText.take(100)}...")
             FileLog.log(TAG, "Generated response: ${generatedText.length} chars, first=${generatedText.take(50)}")
 
+            // 过滤思考内容（Qwen3 thinking mode）
+            generatedText = filterThinkingContent(generatedText)
+            FileLog.log(TAG, "After filter: ${generatedText.length} chars")
+
             // 构建响应
             val chatResponse = ChatResponse(
                 id = "chatcmpl-${System.currentTimeMillis()}",
@@ -177,7 +181,13 @@ class AiHttpServer(
         for (msg in messages) {
             when (msg.role) {
                 "system" -> {
-                    sb.append("<|im_start|>system\n${msg.content}<|im_end|>\n")
+                    // 默认关闭思考模式，提升日常对话响应速度
+                    val systemContent = if (msg.content.contains("/think") || msg.content.contains("/no_think")) {
+                        msg.content  // 用户已手动指定，不覆盖
+                    } else {
+                        "${msg.content} /no_think"  // 默认关闭思考
+                    }
+                    sb.append("<|im_start|>system\n${systemContent}<|im_end|>\n")
                 }
                 "user" -> {
                     sb.append("<|im_start|>user\n${msg.content}<|im_end|>\n")
@@ -191,6 +201,15 @@ class AiHttpServer(
         sb.append("<|im_start|>assistant\n")
 
         return sb.toString()
+    }
+
+    /**
+     * 过滤思考内容（Qwen3 thinking mode）
+     * 移除 <think...</think 块
+     */
+    private fun filterThinkingContent(text: String): String {
+        val filtered = text.replace(Regex("<think[\\s\\S]*?</think\\s*>", RegexOption.MULTILINE), "").trim()
+        return if (filtered.isNotBlank()) filtered else text
     }
 
     private fun jsonResponse(json: String): Response {

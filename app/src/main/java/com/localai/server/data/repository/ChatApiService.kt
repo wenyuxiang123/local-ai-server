@@ -173,12 +173,13 @@ class ChatApiService @Inject constructor() {
     }
     
     // Build messages for API from database messages
-    fun buildMessages(userContent: String, historyMessages: List<ChatMessage>): List<ChatMessage> {
+    fun buildMessages(userContent: String, historyMessages: List<ChatMessage>, thinkMode: Boolean = false): List<ChatMessage> {
         val allMessages = historyMessages.toMutableList()
         
-        // Add enable thinking message for Qwen3
+        // 根据思考模式设置系统提示词
         if (allMessages.isEmpty()) {
-            allMessages.add(ChatMessage("system", "You are a helpful assistant."))
+            val thinkTag = if (thinkMode) " /think" else " /no_think"
+            allMessages.add(ChatMessage("system", "You are a helpful assistant.$thinkTag"))
         }
         
         allMessages.add(ChatMessage("user", userContent))
