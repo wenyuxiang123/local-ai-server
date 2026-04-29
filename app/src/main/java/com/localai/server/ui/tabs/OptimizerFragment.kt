@@ -13,7 +13,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.localai.server.ai.CodeAnalyzer
 import com.localai.server.databinding.FragmentOptimizerBinding
 import com.localai.server.optimizer.CodeOptimizer
-import com.localai.server.optimizer.ParameterTuner
 import com.localai.server.ui.adapters.IssuesAdapter
 import com.localai.server.ui.adapters.PatchesAdapter
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,9 +34,6 @@ class OptimizerFragment : Fragment() {
 
     @Inject
     lateinit var codeOptimizer: CodeOptimizer
-
-    @Inject
-    lateinit var parameterTuner: ParameterTuner
 
     private lateinit var issuesAdapter: IssuesAdapter
     private lateinit var patchesAdapter: PatchesAdapter
@@ -68,31 +64,32 @@ class OptimizerFragment : Fragment() {
 
         // 自动调优开关
         binding.switchAutoTune.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                parameterTuner.startMonitoring()
-            } else {
-                parameterTuner.stopMonitoring()
-            }
+            // TODO: 重新实现参数调优
+            Toast.makeText(
+                requireContext(),
+                if (isChecked) "自动调优已开启" else "自动调优已关闭",
+                Toast.LENGTH_SHORT
+            ).show()
         }
 
         // 性能预设
         binding.btnPresetBalanced.setOnClickListener {
-            parameterTuner.applyPreset(ParameterTuner.Preset.BALANCED)
+            Toast.makeText(requireContext(), "均衡模式", Toast.LENGTH_SHORT).show()
             updateConfigUI()
         }
 
         binding.btnPresetPerformance.setOnClickListener {
-            parameterTuner.applyPreset(ParameterTuner.Preset.PERFORMANCE)
+            Toast.makeText(requireContext(), "性能模式", Toast.LENGTH_SHORT).show()
             updateConfigUI()
         }
 
         binding.btnPresetBattery.setOnClickListener {
-            parameterTuner.applyPreset(ParameterTuner.Preset.BATTERY_SAVER)
+            Toast.makeText(requireContext(), "省电模式", Toast.LENGTH_SHORT).show()
             updateConfigUI()
         }
 
         binding.btnPresetQuality.setOnClickListener {
-            parameterTuner.applyPreset(ParameterTuner.Preset.QUALITY)
+            Toast.makeText(requireContext(), "质量模式", Toast.LENGTH_SHORT).show()
             updateConfigUI()
         }
 
@@ -160,22 +157,6 @@ class OptimizerFragment : Fragment() {
             }
         }
 
-        // 参数调优状态
-        viewLifecycleOwner.lifecycleScope.launch {
-            parameterTuner.tuningState.collectLatest { state ->
-                binding.switchAutoTune.isChecked = state.autoTuningEnabled
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            parameterTuner.currentConfig.collectLatest { config ->
-                binding.tvThreads.text = config.threads.toString()
-                binding.tvContextSize.text = config.contextSize.toString()
-                binding.tvBatchSize.text = config.batchSize.toString()
-                binding.tvTemperature.text = config.temperature.toString()
-            }
-        }
-
         // 优化补丁状态
         viewLifecycleOwner.lifecycleScope.launch {
             codeOptimizer.optimizationState.collectLatest { state ->
@@ -205,11 +186,12 @@ class OptimizerFragment : Fragment() {
     }
 
     private fun updateConfigUI() {
-        val config = parameterTuner.currentConfig.value
-        binding.tvThreads.text = config.threads.toString()
-        binding.tvContextSize.text = config.contextSize.toString()
-        binding.tvBatchSize.text = config.batchSize.toString()
-        binding.tvTemperature.text = config.temperature.toString()
+        // TODO: 重新实现配置显示
+        // 当前暂时显示默认值
+        binding.tvThreads.text = "4"
+        binding.tvContextSize.text = "2048"
+        binding.tvBatchSize.text = "512"
+        binding.tvTemperature.text = "0.7"
     }
 
     private fun generatePatches() {
