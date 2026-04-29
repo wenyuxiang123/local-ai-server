@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.arm.aichat.InferenceEngine
 import com.arm.aichat.UnsupportedArchitectureException
-import com.arm.aichat.OptimizationConfig
 import com.arm.aichat.internal.InferenceEngineImpl.Companion.getInstance
 import dalvik.annotation.optimization.FastNative
 import kotlinx.coroutines.CancellationException
@@ -84,27 +83,13 @@ internal class InferenceEngineImpl private constructor(
     private external fun init(nativeLibDir: String)
 
     @FastNative
-    private external fun load(
-        modelPath: String,
-        nCtx: Int,
-        nThreads: Int,
-        nBatch: Int,
-        flashAttn: Boolean,
-        cacheType: String,
-        nGpuLayers: Int
-    ): Int
+    private external fun load(modelPath: String, nCtx: Int): Int
 
     @FastNative
     private external fun prepare(): Int
 
     @FastNative
     private external fun systemInfo(): String
-
-    @FastNative
-    private external fun nativeGetOptimizationInfo(): String
-
-    @FastNative
-    private external fun nativeTestVulkan(): Int
 
     @FastNative
     private external fun benchModel(pp: Int, tg: Int, pl: Int, nr: Int): String
@@ -160,62 +145,43 @@ internal class InferenceEngineImpl private constructor(
     }
 
     /**
-     * Load the LLM with full optimization parameters
+     * Load the LLM
      */
-    override suspend fun loadModel(
-        pathToModel: String,
-        nCtx: Int,
-        nThreads: Int,
-        nBatch: Int,
-        flashAttn: Boolean,
-        cacheType: String,
-        nGpuLayers: Int
-    ) = withContext(llamaDispatcher) {
-        check(_state.value is InferenceEngine.State.Initialized) {
-            "Cannot load model in ${_state.value.javaClass.simpleName}!"
-        }
-
-        try {
-            Log.i(TAG, "Checking access to model file... \n$pathToModel")
-            File(pathToModel).let {
-                require(it.exists()) { "File not found" }
-                require(it.isFile) { "Not a valid file" }
-                require(it.canRead()) { "Cannot read file" }
+    override suspend fun loadModel(pathToModel: String, nCtx: Int) =
+        withContext(llamaDispatcher) {
+            check(_state.value is InferenceEngine.State.Initialized) {
+                "Cannot load model in ${_state.value.javaClass.simpleName}!"
             }
 
-            Log.i(TAG, "Loading model with optimizations:")
-            Log.i(TAG, "  - Path: $pathToModel")
-            Log.i(TAG, "  - nCtx: $nCtx")
-            Log.i(TAG, "  - nThreads: $nThreads")
-            Log.i(TAG, "  - nBatch: $nBatch")
-            Log.i(TAG, "  - flashAttn: $flashAttn")
-            Log.i(TAG, "  - cacheType: $cacheType")
-            Log.i(TAG, "  - nGpuLayers: $nGpuLayers")
-            
-            _readyForSystemPrompt = false
-            _state.value = InferenceEngine.State.LoadingModel
-            
-            // Call native load with all optimization parameters
-            load(pathToModel, nCtx, nThreads, nBatch, flashAttn, cacheType, nGpuLayers).let {
-                // TODO-han.yin: find a better way to pass other error codes
-                if (it != 0) throw UnsupportedArchitectureException()
+            try {
+                Log.i(TAG, "Checking access to model file... \n$pathToModel")
+                File(pathToModel).let {
+                    require(it.exists()) { "File not found" }
+                    require(it.isFile) { "Not a valid file" }
+                    require(it.canRead()) { "Cannot read file" }
+                }
+
+                Log.i(TAG, "Loading model... \n$pathToModel")
+                _readyForSystemPrompt = false
+                _state.value = InferenceEngine.State.LoadingModel
+                load(pathToModel, nCtx).let {
+                    // TODO-han.yin: find a better way to pass other error codes
+                    if (it != 0) throw UnsupportedArchitectureException()
+                }
+                prepare().let {
+                    if (it != 0) throw IOException("Failed to prepare resources")
+                }
+                Log.i(TAG, "Model loaded!")
+                _readyForSystemPrompt = true
+
+                _cancelGeneration = false
+                _state.value = InferenceEngine.State.ModelReady
+            } catch (e: Exception) {
+                Log.e(TAG, (e.message ?: "Error loading model") + "\n" + pathToModel, e)
+                _state.value = InferenceEngine.State.Error(e)
+                throw e
             }
-            prepare().let {
-                if (it != 0) throw IOException("Failed to prepare resources")
-            }
-            
-            Log.i(TAG, "Model loaded successfully!")
-            Log.i(TAG, "Optimization info: ${nativeGetOptimizationInfo()}")
-            
-            _readyForSystemPrompt = true
-            _cancelGeneration = false
-            _state.value = InferenceEngine.State.ModelReady
-        } catch (e: Exception) {
-            Log.e(TAG, (e.message ?: "Error loading model") + "\n" + pathToModel, e)
-            _state.value = InferenceEngine.State.Error(e)
-            throw e
         }
-    }
 
     /**
      * Process the plain text system prompt
@@ -354,30 +320,5 @@ internal class InferenceEngineImpl private constructor(
             }
         }
         llamaScope.cancel()
-    }
-
-    /**
-     * Test if Vulkan GPU backend is available
-     * Returns true if Vulkan is functional, false otherwise
-     */
-    override fun testVulkanSupport(): Boolean {
-        return try {
-            nativeTestVulkan() > 0
-        } catch (e: Exception) {
-            Log.e(TAG, "Vulkan test failed", e)
-            false
-        }
-    }
-
-    /**
-     * Get current optimization configuration
-     */
-    override fun getOptimizationInfo(): String {
-        return try {
-            nativeGetOptimizationInfo()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get optimization info", e)
-            "{}"
-        }
     }
 }

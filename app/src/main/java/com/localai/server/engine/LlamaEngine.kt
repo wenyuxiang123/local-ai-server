@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
-import com.arm.aichat.OptimizationConfig
 import com.arm.aichat.isModelLoaded
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -19,7 +18,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.File
@@ -30,7 +28,6 @@ import com.localai.server.util.FileLog
 /**
  * LlamaEngine 基于 llama.cpp 官方 Android 绑定实现
  * 使用 InferenceEngine 和 AiChat 类进行模型推理
- * 支持 llama.cpp 全部优化参数：Vulkan GPU offload、Flash Attention、KV cache 量化等
  */
 @Singleton
 class LlamaEngine @Inject constructor(
@@ -38,9 +35,6 @@ class LlamaEngine @Inject constructor(
 ) {
     companion object {
         private const val TAG = "LlamaEngine"
-        private const val PREFS_NAME = "llama_engine_prefs"
-        private const val KEY_VULKAN_STATUS = "vulkan_status"  // "ok", "fail", "testing", "unknown"
-        private const val KEY_VULKAN_TESTED = "vulkan_tested"
         
         private var _instance: LlamaEngine? = null
         private var _engine: InferenceEngine? = null
@@ -96,7 +90,6 @@ class LlamaEngine @Inject constructor(
     private var loadedModelPath: String? = null
     private var loadedModelName: String? = null
     private var _systemPrompt: String = ""
-    private var _currentOptimization: OptimizationConfig = OptimizationConfig()
     
     init {
         Log.i(TAG, "LlamaEngine instance created")
@@ -114,90 +107,9 @@ class LlamaEngine @Inject constructor(
     }
     
     /**
-     * 加载模型 - 支持全部优化参数
-     * 
-     * @param path 模型文件路径
-     * @param nCtx 上下文大小 (默认: 2048)
-     * @param nThreads CPU 线程数 (默认: 4)
-     * @param nBatch 批处理大小 (默认: 512)
-     * @param flashAttn 启用 Flash Attention (默认: true)
-     * @param cacheType KV cache 量化类型: "f16", "q8_0", "q4_0", "q5_0", "q5_1" (默认: "f16")
-     * @param nGpuLayers GPU 卸载层数 (0=纯CPU, -1=全部, >0=指定层数) (默认: 0)
+     * 加载模型
      */
-    /**
-     * Test Vulkan support safely with crash recovery
-     * Returns true if Vulkan is available and functional
-     */
-    fun testVulkanSupport(): Boolean {
-        // Check crash recovery: if last test left status as "testing", it crashed
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val lastStatus = prefs.getString(KEY_VULKAN_STATUS, "unknown")
-        
-        if (lastStatus == "testing") {
-            // Last Vulkan test caused a crash
-            Log.w(TAG, "Vulkan test crashed last time, marking as unsupported")
-            prefs.edit().putString(KEY_VULKAN_STATUS, "fail").apply()
-            return false
-        }
-        
-        if (lastStatus == "fail") {
-            Log.i(TAG, "Vulkan previously marked as unsupported")
-            return false
-        }
-        
-        if (lastStatus == "ok") {
-            Log.i(TAG, "Vulkan previously tested OK")
-            return _engine?.testVulkanSupport() ?: false
-        }
-        
-        // First time: test with crash recovery
-        return try {
-            prefs.edit().putString(KEY_VULKAN_STATUS, "testing").apply()
-            val result = _engine?.testVulkanSupport() ?: false
-            prefs.edit().putString(KEY_VULKAN_STATUS, if (result) "ok" else "fail").apply()
-            Log.i(TAG, "Vulkan test result: $result")
-            result
-        } catch (e: Exception) {
-            Log.e(TAG, "Vulkan test exception", e)
-            prefs.edit().putString(KEY_VULKAN_STATUS, "fail").apply()
-            false
-        }
-    }
-    
-    /**
-     * Reset Vulkan status (allow re-testing)
-     */
-    fun resetVulkanStatus() {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY_VULKAN_STATUS, "unknown").apply()
-    }
-    
-    /**
-     * Check if GPU offload is safe to enable
-     * Automatically downgrades to CPU if Vulkan is not available
-     */
-    fun safeGpuLayers(requestedLayers: Int): Int {
-        if (requestedLayers == 0) return 0  // CPU mode, no check needed
-        
-        val vulkanOk = testVulkanSupport()
-        if (!vulkanOk) {
-            Log.w(TAG, "Vulkan not available, GPU offload disabled (requested: $requestedLayers)")
-            return 0
-        }
-        
-        Log.i(TAG, "Vulkan available, GPU offload enabled: $requestedLayers layers")
-        return requestedLayers
-    }
-
-    suspend fun loadModel(
-        path: String,
-        nCtx: Int = 2048,
-        nThreads: Int = 4,
-        nBatch: Int = 512,
-        flashAttn: Boolean = true,
-        cacheType: String = "f16",
-        nGpuLayers: Int = 0
-    ): Boolean = withContext(Dispatchers.IO) {
+    suspend fun loadModel(path: String, nCtx: Int = 2048, nThreads: Int = 4): Boolean = withContext(Dispatchers.IO) {
         val file = File(path)
         if (!file.exists()) {
             Log.e(TAG, "Model file not found: $path")
@@ -232,41 +144,12 @@ class LlamaEngine @Inject constructor(
                 unloadModel()
             }
             
-            Log.i(TAG, "Loading model with llama.cpp optimizations:")
-            Log.i(TAG, "  Model: ${file.name}, size=${file.length() / 1024 / 1024}MB")
-            Log.i(TAG, "  nCtx: $nCtx, nThreads: $nThreads, nBatch: $nBatch")
-            // 安全检测GPU：如果Vulkan不可用则自动降级为CPU
-            val actualGpuLayers = safeGpuLayers(nGpuLayers)
-            if (actualGpuLayers != nGpuLayers) {
-                Log.w(TAG, "GPU offload downgraded: $nGpuLayers -> $actualGpuLayers (Vulkan not available)")
-                FileLog.log(TAG, "WARNING: GPU offload downgraded: $nGpuLayers -> $actualGpuLayers")
-            }
+            Log.i(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB")
+            FileLog.log(TAG, "Loading model: ${file.name}, size=${file.length() / 1024 / 1024}MB, nCtx=$nCtx, nThreads=$nThreads")
+            Log.i(TAG, "Context size: $nCtx, Threads: $nThreads")
             
-            Log.i(TAG, "  flashAttn: $flashAttn, cacheType: $cacheType, nGpuLayers: $actualGpuLayers")
-            FileLog.log(TAG, "Loading model: ${file.name}")
-            FileLog.log(TAG, "Optimizations: nCtx=$nCtx, nThreads=$nThreads, nBatch=$nBatch")
-            FileLog.log(TAG, "flashAttn=$flashAttn, cacheType=$cacheType, nGpuLayers=$actualGpuLayers")
-            
-            // 使用官方 API 加载模型，传入全部优化参数
-            engine.loadModel(
-                pathToModel = path,
-                nCtx = nCtx,
-                nThreads = nThreads,
-                nBatch = nBatch,
-                flashAttn = flashAttn,
-                cacheType = cacheType,
-                nGpuLayers = actualGpuLayers
-            )
-            
-            // 更新当前优化配置（使用实际GPU层数）
-            _currentOptimization = OptimizationConfig(
-                nCtx = nCtx,
-                nThreads = nThreads,
-                nBatch = nBatch,
-                flashAttn = flashAttn,
-                cacheType = cacheType,
-                nGpuLayers = actualGpuLayers
-            )
+            // 使用官方 API 加载模型，传入上下文大小
+            engine.loadModel(path, nCtx)
             
             // 如果之前有设置过 system prompt，重新设置
             if (_systemPrompt.isNotEmpty()) {
@@ -279,31 +162,15 @@ class LlamaEngine @Inject constructor(
             
             Log.i(TAG, "Model loaded successfully: ${file.name}")
             FileLog.log(TAG, "Model loaded successfully: ${file.name}")
-            
-            // 获取并打印优化信息
-            try {
-                val optInfo = engine.getOptimizationInfo()
-                Log.i(TAG, "Optimization info: $optInfo")
-                FileLog.log(TAG, "Active optimizations: $optInfo")
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to get optimization info", e)
-            }
-            
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load model", e)
-            FileLog.log(TAG, "Model load failed: ${e.message}")
             isModelLoaded = false
             loadedModelPath = null
             loadedModelName = null
             false
         }
     }
-    
-    /**
-     * 获取当前优化配置
-     */
-    fun getOptimizationConfig(): OptimizationConfig = _currentOptimization
     
     /**
      * 设置系统提示词
@@ -331,65 +198,140 @@ class LlamaEngine @Inject constructor(
      */
     fun unloadModel() {
         try {
-            Log.i(TAG, "Unloading model...")
             engine.cleanUp()
             isModelLoaded = false
+            loadedModelPath = null
+            loadedModelName = null
             Log.i(TAG, "Model unloaded")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to unload model", e)
+            Log.e(TAG, "Error unloading model", e)
         }
     }
     
-    /**
-     * 生成文本
-     */
-    fun generate(prompt: String, maxTokens: Int = 1024, temperature: Float = 0.7f): String {
-        val startTime = System.currentTimeMillis()
-        val buffer = StringBuilder()
+    fun isModelLoaded(): Boolean {
+        // 同时检查本地标志和engine状态，防止竞态导致的状态不一致
+        if (!isModelLoaded) return false
         
-        runBlocking(Dispatchers.IO) {
+        val engineState = engine.state.value
+        val engineReady = engineState is InferenceEngine.State.ModelReady ||
+                          engineState is InferenceEngine.State.Generating ||
+                          engineState is InferenceEngine.State.ProcessingUserPrompt ||
+                          engineState is InferenceEngine.State.ProcessingSystemPrompt
+        
+        Log.d(TAG, "isModelLoaded() check: localFlag=$isModelLoaded, engineState=${engineState.javaClass.simpleName}, engineReady=$engineReady")
+        
+        // 如果引擎状态异常但本地标志为true，重置本地标志
+        if (!engineReady && isModelLoaded) {
+            Log.w(TAG, "Engine state mismatch! Resetting isModelLoaded flag. Engine was: ${engineState.javaClass.simpleName}")
+            isModelLoaded = false
+            return false
+        }
+        
+        return engineReady
+    }
+    
+    /**
+     * 同步生成（等待完整结果）
+     */
+    suspend fun generate(
+        prompt: String, 
+        maxTokens: Int = 512, 
+        temperature: Float = 0.7f, 
+        topK: Int = 40, 
+        topP: Float = 0.9f
+    ): String = withContext(Dispatchers.IO) {
+        // 重新检查模型状态，确保同步检查
+        if (!isModelLoaded()) throw IllegalStateException("模型未加载或引擎状态异常")
+        
+        try {
+            Log.d(TAG, "Generating response for prompt: ${prompt.take(50)}...")
+            val genStartTime = System.currentTimeMillis()
+            FileLog.log(TAG, "Starting generation, prompt=${prompt.take(50)}..., maxTokens=$maxTokens")
+            
+            val result = StringBuilder()
             engine.sendUserPrompt(prompt, maxTokens)
+                .map { token ->
+                    result.append(token)
+                    token
+                }
                 .catch { e ->
                     Log.e(TAG, "Generation error", e)
+                    throw e
                 }
-                .collect { token ->
-                    buffer.append(token)
-                }
-        }
-        
-        val elapsed = System.currentTimeMillis() - startTime
-        Log.i(TAG, "Generated ${buffer.length} chars in ${elapsed}ms (${buffer.length * 1000 / elapsed.coerceAtLeast(1)} chars/s)")
-        
-        return buffer.toString()
-    }
-    
-    /**
-     * 检查模型是否已加载
-     */
-    fun isModelLoaded(): Boolean = isModelLoaded
-    
-    /**
-     * 获取已加载模型信息
-     */
-    fun getLoadedModelInfo(): Map<String, Any?> {
-        return mapOf(
-            "name" to loadedModelName,
-            "path" to loadedModelPath,
-            "loaded" to isModelLoaded
-        ) + _currentOptimization.let {
-            mapOf(
-                "nCtx" to it.nCtx,
-                "nThreads" to it.nThreads,
-                "nBatch" to it.nBatch,
-                "flashAttn" to it.flashAttn,
-                "cacheType" to it.cacheType,
-                "nGpuLayers" to it.nGpuLayers
-            )
+                .collect { }
+            
+            val genDuration = System.currentTimeMillis() - genStartTime
+            Log.d(TAG, "Generated ${result.length} characters in ${genDuration}ms")
+            FileLog.log(TAG, "Generation complete: ${result.length} chars in ${genDuration}ms")
+            result.toString()
+        } catch (e: IllegalStateException) {
+            // Engine state mismatch - reset local flag
+            Log.e(TAG, "Engine state mismatch during generation", e)
+            isModelLoaded = false
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Generation failed", e)
+            FileLog.log(TAG, "Generation failed: ${e.message}")
+            // 检查engine状态是否异常，如果是则重置标志
+            val state = engine.state.value
+            if (state !is InferenceEngine.State.ModelReady && 
+                state !is InferenceEngine.State.Generating) {
+                Log.w(TAG, "Engine state abnormal, resetting isModelLoaded flag. State: ${state.javaClass.simpleName}")
+                isModelLoaded = false
+            }
+            throw e
         }
     }
     
     /**
-     * 获取已加载模型名称
+     * 流式生成（返回 Flow）
      */
+    fun generateStream(
+        prompt: String, 
+        maxTokens: Int = 512, 
+        temperature: Float = 0.7f, 
+        topK: Int = 40, 
+        topP: Float = 0.9f
+    ): Flow<String> {
+        if (!isModelLoaded()) throw IllegalStateException("模型未加载或引擎状态异常")
+        
+        Log.d(TAG, "Streaming generation for prompt: ${prompt.take(50)}...")
+        return engine.sendUserPrompt(prompt, maxTokens)
+    }
+    
     fun getLoadedModelName(): String? = loadedModelName
+    
+    fun getMemoryUsage(): Long {
+        if (!isModelLoaded) return 0
+        val file = loadedModelPath?.let { File(it) }
+        return file?.length() ?: 0
+    }
+    
+    fun getModelInfo(): Map<String, Any> {
+        return mapOf(
+            "loaded" to isModelLoaded,
+            "name" to (loadedModelName ?: "未加载"),
+            "path" to (loadedModelPath ?: ""),
+            "memoryUsage" to getMemoryUsage(),
+            "engine" to "llama.cpp official Android binding",
+            "state" to (_state.value.javaClass.simpleName),
+            "systemPromptSet" to (_systemPrompt.isNotEmpty())
+        )
+    }
+    
+    fun getLoadedModelInfo(): Map<String, Any> = getModelInfo()
+    
+    /**
+     * 销毁引擎
+     */
+    fun destroy() {
+        try {
+            engine.destroy()
+            _instance = null
+            _engine = null
+            Log.i(TAG, "Engine destroyed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error destroying engine", e)
+        }
+    }
 }

@@ -8,7 +8,6 @@ import com.localai.server.domain.model.ServerStatus
 import com.localai.server.domain.repository.AIRepository
 import com.localai.server.domain.repository.DownloadProgress
 import com.localai.server.engine.LlamaEngine
-import com.localai.server.optimizer.ParameterTuner
 import com.localai.server.service.AIService
 import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,8 +25,7 @@ import javax.inject.Singleton
 class AIRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val engine: LlamaEngine,
-    private val modelExtractor: ModelExtractor,
-    private val parameterTuner: ParameterTuner
+    private val modelExtractor: ModelExtractor
 ) : AIRepository {
     
     companion object {
@@ -166,40 +164,17 @@ class AIRepositoryImpl @Inject constructor(
                 return@withContext Result.failure(Exception("模型文件不存在"))
             }
             
-            // 获取 ParameterTuner 推荐的优化参数
-            val config = parameterTuner.currentConfig.value
-            
-            // 计算最优线程数 - 如果 ParameterTuner 没有动态调整
+            // 计算最优线程数 - 根据CPU核心数动态调整
             val cores = Runtime.getRuntime().availableProcessors()
-            val threads = if (config.threads > 0) {
-                config.threads
-            } else {
-                when {
-                    cores >= 8 -> (cores - 2).coerceIn(4, 6)
-                    cores >= 6 -> (cores - 1).coerceIn(3, 5)
-                    else -> cores.coerceIn(2, 4)
-                }
+            val threads = when {
+                cores >= 8 -> (cores - 2).coerceIn(4, 6)  // 8核以上留2核给系统
+                cores >= 6 -> (cores - 1).coerceIn(3, 5)  // 6核留1核
+                else -> cores.coerceIn(2, 4)
             }
             
-            Log.i(TAG, "Loading model with llama.cpp optimizations:")
-            Log.i(TAG, "  Model: ${file.name}")
-            Log.i(TAG, "  nCtx: ${config.contextSize}")
-            Log.i(TAG, "  nThreads: $threads")
-            Log.i(TAG, "  nBatch: ${config.batchSize}")
-            Log.i(TAG, "  flashAttn: ${config.flashAttn}")
-            Log.i(TAG, "  cacheType: ${config.cacheType}")
-            Log.i(TAG, "  nGpuLayers: ${config.gpuLayers}")
-            
-            // 加载模型 - 传入全部优化参数
-            val success = engine.loadModel(
-                path = path,
-                nCtx = config.contextSize,
-                nThreads = threads,
-                nBatch = config.batchSize,
-                flashAttn = config.flashAttn,
-                cacheType = config.cacheType,
-                nGpuLayers = config.gpuLayers
-            )
+            // 加载模型 - 4B 模型使用动态上下文大小
+            val contextSize = 2048  // 默认值，后续可从ParameterTuner获取
+            val success = engine.loadModel(path, contextSize, threads)
             
             if (success) {
                 // 更新 AIService 的模型加载状态
@@ -209,15 +184,7 @@ class AIRepositoryImpl @Inject constructor(
                     name = file.nameWithoutExtension,
                     path = path,
                     threads = threads,
-                    sizeBytes = file.length(),
-                    // 附加优化信息
-                    optimizationInfo = mapOf(
-                        "contextSize" to config.contextSize,
-                        "batchSize" to config.batchSize,
-                        "flashAttn" to config.flashAttn,
-                        "cacheType" to config.cacheType,
-                        "gpuLayers" to config.gpuLayers
-                    )
+                    sizeBytes = file.length()
                 )
                 Result.success(config)
             } else {
@@ -289,24 +256,12 @@ class AIRepositoryImpl @Inject constructor(
             null
         }
         
-        // 获取当前优化配置
-        val optConfig = engine.getOptimizationConfig()
-        
         return ServerStatus(
             isRunning = AIService.isRunning.value,
             modelLoaded = AIService.modelLoaded.value,
             loadedModel = engine.getLoadedModelInfo()["name"] as? String ?: "",
             address = serverAddress,
-            uptime = 0,
-            optimizationInfo = mapOf(
-                "nCtx" to optConfig.nCtx,
-                "nThreads" to optConfig.nThreads,
-                "nBatch" to optConfig.nBatch,
-                "flashAttn" to optConfig.flashAttn,
-                "cacheType" to optConfig.cacheType,
-                "nGpuLayers" to optConfig.nGpuLayers,
-                "backend" to optConfig.backend
-            )
+            uptime = 0
         )
     }
 }

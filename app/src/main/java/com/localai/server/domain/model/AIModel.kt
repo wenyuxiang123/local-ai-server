@@ -5,8 +5,7 @@ data class ModelConfig(
     val path: String,
     val contextSize: Int = 2048,
     val threads: Int = 4,
-    val sizeBytes: Long = 0,
-    val optimizationInfo: Map<String, Any?> = emptyMap()
+    val sizeBytes: Long = 0
 )
 
 data class GenerateConfig(
@@ -21,8 +20,7 @@ data class ServerStatus(
     val modelLoaded: Boolean,
     val loadedModel: String?,
     val address: String?,
-    val uptime: Long,
-    val optimizationInfo: Map<String, Any?> = emptyMap()
+    val uptime: Long
 )
 
 data class ModelInfo(
