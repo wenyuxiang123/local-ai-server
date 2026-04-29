@@ -20,3 +20,13 @@ local.properties
 # Keystore
 *.jks
 *.keystore
+
+# Build logs
+build_logs/
+build_logs.zip
+
+# Kotlin sessions
+.kotlin/
+
+# APK signing artifacts
+*.idsig
