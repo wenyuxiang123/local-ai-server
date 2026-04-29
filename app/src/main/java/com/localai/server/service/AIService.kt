@@ -41,6 +41,7 @@ class AIService : Service() {
         const val EXTRA_MODEL_PATH = "model_path"
         const val EXTRA_N_CTX = "n_ctx"
         const val EXTRA_N_THREADS = "n_threads"
+        const val EXTRA_N_GPU_LAYERS = "n_gpu_layers"
         
         // 服务状态
         private val _isRunning = MutableStateFlow(false)
@@ -73,12 +74,13 @@ class AIService : Service() {
             context.startService(intent)
         }
         
-        fun loadModel(context: Context, path: String, nCtx: Int = 2048, nThreads: Int = 4) {
+        fun loadModel(context: Context, path: String, nCtx: Int = 2048, nThreads: Int = 4, nGpuLayers: Int = 0) {
             val intent = Intent(context, AIService::class.java).apply {
                 action = ACTION_LOAD_MODEL
                 putExtra(EXTRA_MODEL_PATH, path)
                 putExtra(EXTRA_N_CTX, nCtx)
                 putExtra(EXTRA_N_THREADS, nThreads)
+                putExtra(EXTRA_N_GPU_LAYERS, nGpuLayers)
             }
             context.startService(intent)
         }
