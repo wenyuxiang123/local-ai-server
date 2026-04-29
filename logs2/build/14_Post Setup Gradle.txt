@@ -1,0 +1,22 @@
+﻿2026-04-29T07:35:15.7829037Z Post job cleanup.
+2026-04-29T07:35:16.0204775Z In post-action step
+2026-04-29T07:35:16.0213451Z Stopping all Gradle daemons before saving Gradle User Home state
+2026-04-29T07:35:16.0214556Z Stopping Gradle daemons for /home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta/gradle-8.2
+2026-04-29T07:35:16.0232390Z [command]/home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta/gradle-8.2/bin/gradle --stop
+2026-04-29T07:35:16.7833403Z No Gradle daemons are running.
+2026-04-29T07:35:16.8045172Z ##[group]Caching Gradle state
+2026-04-29T07:35:16.8516506Z Caching wrapper-zips with path '/home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta' and cache key: gradle-wrapper-zips-v1-d75ab2e302ad9e0b00dcd53244709342
+2026-04-29T07:35:16.8658741Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T07:35:17.3899554Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/wrapper/dists/gradle-8.2-bin/bbg7u40eoinfdyxsxr3z4i7ta' and key: gradle-wrapper-zips-v1-d75ab2e302ad9e0b00dcd53244709342: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0tbTxaQAAAACEGV4AhM31QaPhvhSndLpjUEhMMzBFREdFMDIxOABFZGdl
+2026-04-29T07:35:17.4730380Z Caching dependencies with path '/home/runner/.gradle/caches/modules-*/files-*/*/*/*/*' and cache key: gradle-dependencies-v1-589748f70d91829827804314b52ecf75
+2026-04-29T07:35:17.5210736Z Caching instrumented-jars with path '/home/runner/.gradle/caches/jars-*/*/' and cache key: gradle-instrumented-jars-v1-60aa80fd15d9c6a99ad02fe2b0ed7b8a
+2026-04-29T07:35:17.6152920Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T07:35:18.0377825Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T07:35:19.1784192Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/caches/jars-*/*/' and key: gradle-instrumented-jars-v1-60aa80fd15d9c6a99ad02fe2b0ed7b8a: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0t7TxaQAAAAAKz8SJMru5RrSYITh+ECMXUEhMMzBFREdFMDEyMgBFZGdl
+2026-04-29T07:35:19.3565202Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/caches/modules-*/files-*/*/*/*/*' and key: gradle-dependencies-v1-589748f70d91829827804314b52ecf75: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0t7TxaQAAAABt3tnY5RVZTrp/yYiU3JdRUEhMMzBFREdFMDExMwBFZGdl
+2026-04-29T07:35:19.5075984Z Caching Gradle User Home with cache key: gradle-home-v1|Linux|build[620c74083efa5b88ef904c2356f72d31]-822e9924e3b485a526799f0b035473afd37037b0
+2026-04-29T07:35:19.5158113Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/local-ai-server/local-ai-server --files-from manifest.txt --use-compress-program zstdmt
+2026-04-29T07:35:19.9598188Z ##[warning]Failed to save cache entry with path '/home/runner/.gradle/caches,/home/runner/.gradle/notifications,/home/runner/.gradle/.setup-gradle' and key: gradle-home-v1|Linux|build[620c74083efa5b88ef904c2356f72d31]-822e9924e3b485a526799f0b035473afd37037b0: Error: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0t7TxaQAAAABbTOsjIOtkSp9oFl9J0BMbUEhMMzBFREdFMDEwNwBFZGdl
+2026-04-29T07:35:19.9602892Z ##[endgroup]
+2026-04-29T07:35:19.9603284Z Generating Job Summary
+2026-04-29T07:35:19.9618598Z Completed post-action step

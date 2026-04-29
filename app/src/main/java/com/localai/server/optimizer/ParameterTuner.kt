@@ -225,12 +225,8 @@ class ParameterTuner @Inject constructor(
             else -> 512  // < 4GB
         }
         
-        // 根据设备能力设置 GPU 参数
-        val gpuLayers = when {
-            deviceInfo.hasVulkan && deviceInfo.totalMemory >= 8L * 1024 * 1024 * 1024 -> -1  // 有 Vulkan 且内存充足，全部 offload
-            deviceInfo.hasVulkan && deviceInfo.totalMemory >= 6L * 1024 * 1024 * 1024 -> 16  // 部分 offload
-            else -> 0  // 纯 CPU
-        }
+        // GPU offload 默认关闭，需用户手动开启（Vulkan 兼容性不保证）
+        val gpuLayers = 0
         
         // 低内存设备减少配置
         val adjustedContextSize = if (deviceInfo.isLowRamDevice) {
