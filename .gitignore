@@ -30,3 +30,5 @@ build_logs.zip
 
 # APK signing artifacts
 *.idsig
+logs*.zip
+logs*/
