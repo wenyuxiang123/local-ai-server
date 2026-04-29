@@ -193,7 +193,7 @@ class AIRepositoryImpl @Inject constructor(
                 nThreads = threads,
                 nBatch = nBatch,
                 flashAttn = true,    // 默认开启 Flash Attention
-                cacheType = "q4_0"   // 默认 Q4_0 量化
+                cacheType = "f16"    // CPU上f16比Q4_0快，避免反量化开销
             )
             
             if (success) {
@@ -208,7 +208,7 @@ class AIRepositoryImpl @Inject constructor(
                     optimizationParams = com.localai.server.domain.model.OptimizationParams(
                         nBatch = nBatch,
                         flashAttn = true,
-                        cacheType = "q4_0"
+                        cacheType = "f16"
                     )
                 )
                 Result.success(config)

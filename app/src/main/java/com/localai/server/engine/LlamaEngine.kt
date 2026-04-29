@@ -121,7 +121,7 @@ class LlamaEngine @Inject constructor(
         nThreads: Int = 4,
         nBatch: Int = 512,
         flashAttn: Boolean = true,
-        cacheType: String = "q4_0"
+        cacheType: String = "f16"
     ): Boolean = withContext(Dispatchers.IO) {
         val file = File(path)
         if (!file.exists()) {
@@ -334,7 +334,7 @@ class LlamaEngine @Inject constructor(
         return com.localai.server.domain.model.OptimizationParams(
             nBatch = nBatch,
             flashAttn = true,
-            cacheType = "q4_0"
+            cacheType = "f16"
         )
     }
     

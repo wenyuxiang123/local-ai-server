@@ -42,8 +42,8 @@ static int                                 g_n_ctx = DEFAULT_CONTEXT_SIZE;
 
 // 可配置的优化参数（默认值）
 static bool        g_flash_attn = true;
-static ggml_type   g_cache_type_k = GGML_TYPE_Q4_0;
-static ggml_type   g_cache_type_v = GGML_TYPE_Q4_0;
+static ggml_type   g_cache_type_k = GGML_TYPE_F16;
+static ggml_type   g_cache_type_v = GGML_TYPE_F16;
 static int         g_n_batch = BATCH_SIZE;
 
 extern "C"
