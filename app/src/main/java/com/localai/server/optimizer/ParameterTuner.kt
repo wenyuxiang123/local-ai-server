@@ -95,7 +95,7 @@ class ParameterTuner @Inject constructor(
      */
     data class InferenceConfig(
         val threads: Int = 4,
-        val contextSize: Int = 2048,
+        val contextSize: Int = 2048,  // 保持默认值不变，实际值由设备决定
         val batchSize: Int = 1,
         val gpuEnabled: Boolean = false,
         val useMmap: Boolean = true,
@@ -177,12 +177,13 @@ class ParameterTuner @Inject constructor(
             else -> 2
         }
         
-        // 根据内存设置上下文大小
+        // 根据内存设置上下文大小 - 针对4B模型优化
         val contextSize = when {
-            deviceInfo.totalMemory >= 8L * 1024 * 1024 * 1024 -> 4096  // >= 8GB
-            deviceInfo.totalMemory >= 6L * 1024 * 1024 * 1024 -> 3072  // >= 6GB
-            deviceInfo.totalMemory >= 4L * 1024 * 1024 * 1024 -> 2048  // >= 4GB
-            else -> 1024  // < 4GB
+            deviceInfo.totalMemory >= 12L * 1024 * 1024 * 1024 -> 4096  // >= 12GB (如红魔9 Pro+)
+            deviceInfo.totalMemory >= 8L * 1024 * 1024 * 1024 -> 2048  // >= 8GB
+            deviceInfo.totalMemory >= 6L * 1024 * 1024 * 1024 -> 1536  // >= 6GB
+            deviceInfo.totalMemory >= 4L * 1024 * 1024 * 1024 -> 1024  // >= 4GB
+            else -> 512  // < 4GB
         }
         
         // 低内存设备减少配置

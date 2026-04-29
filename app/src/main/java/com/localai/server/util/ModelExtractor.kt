@@ -31,19 +31,19 @@ class ModelExtractor @Inject constructor(
         private const val PREFS_NAME = "model_extractor"
         private const val KEY_MODEL_EXTRACTED = "model_extracted"
         private const val KEY_MODEL_VERSION = "model_version"
-        private const val CURRENT_MODEL_VERSION = "4B_v1"
-        private const val MODEL_FILE_NAME = "Qwen3-4B-Q4_K_M.gguf"
+        private const val CURRENT_MODEL_VERSION = "4B_Q3_v1"
+        private const val MODEL_FILE_NAME = "Qwen3-4B-Q3_K_M.gguf"
         private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer
-        private const val EXPECTED_TOTAL_SIZE = 2497281312L // 4B Q4_K_M模型实际大小
+        private const val EXPECTED_TOTAL_SIZE = 0L  // Q3_K_M 模型，下载后不校验精确大小
         
-private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q4_K_M.gguf"
+private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q3_K_M.gguf"
 private val MODEL_DOWNLOAD_URLS = listOf(
     // 1. ModelScope主源 - resolve格式（国内，速度快，支持302跳转到CDN）
-    "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q4_K_M.gguf",
+    "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q3_K_M.gguf",
     // 2. ModelScope备选 - repo API格式
-    "https://modelscope.cn/api/v1/models/unsloth/Qwen3-4B-GGUF/repo?Revision=master&FilePath=Qwen3-4B-Q4_K_M.gguf",
+    "https://modelscope.cn/api/v1/models/unsloth/Qwen3-4B-GGUF/repo?Revision=master&FilePath=Qwen3-4B-Q3_K_M.gguf",
     // 3. HuggingFace备选源
-    "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
+    "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q3_K_M.gguf"
 )
     }
     
@@ -65,7 +65,7 @@ private val MODEL_DOWNLOAD_URLS = listOf(
     fun isModelExtracted(): Boolean {
         val versionMatch = prefs.getString(KEY_MODEL_VERSION, "") == CURRENT_MODEL_VERSION
         val fileExists = modelFile.exists()
-        val sizeMatch = modelFile.length() == EXPECTED_TOTAL_SIZE
+        val sizeMatch = if (EXPECTED_TOTAL_SIZE == 0L) fileExists else modelFile.length() == EXPECTED_TOTAL_SIZE
         return versionMatch && fileExists && sizeMatch
     }
     

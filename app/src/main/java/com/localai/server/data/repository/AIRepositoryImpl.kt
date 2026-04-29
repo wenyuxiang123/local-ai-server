@@ -164,11 +164,17 @@ class AIRepositoryImpl @Inject constructor(
                 return@withContext Result.failure(Exception("模型文件不存在"))
             }
             
-            // 计算最优线程数 - 14B 模型需要更多内存，降低线程数
-            val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
+            // 计算最优线程数 - 根据CPU核心数动态调整
+            val cores = Runtime.getRuntime().availableProcessors()
+            val threads = when {
+                cores >= 8 -> (cores - 2).coerceIn(4, 6)  // 8核以上留2核给系统
+                cores >= 6 -> (cores - 1).coerceIn(3, 5)  // 6核留1核
+                else -> cores.coerceIn(2, 4)
+            }
             
-            // 加载模型 - 14B 模型建议使用更大的上下文
-            val success = engine.loadModel(path, 2048, threads)
+            // 加载模型 - 4B 模型使用动态上下文大小
+            val contextSize = 2048  // 默认值，后续可从ParameterTuner获取
+            val success = engine.loadModel(path, contextSize, threads)
             
             if (success) {
                 // 更新 AIService 的模型加载状态
