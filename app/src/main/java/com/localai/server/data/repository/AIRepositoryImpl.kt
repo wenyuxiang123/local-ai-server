@@ -10,6 +10,7 @@ import com.localai.server.domain.repository.AIRepository
 import com.localai.server.domain.repository.DownloadProgress
 import com.localai.server.engine.LlamaEngine
 import com.localai.server.service.AIService
+import com.localai.server.util.FileLog
 import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
