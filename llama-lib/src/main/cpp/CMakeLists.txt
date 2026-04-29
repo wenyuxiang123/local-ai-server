@@ -21,9 +21,10 @@ if(DEFINED ANDROID_ABI)
         set(GGML_SYSTEM_ARCH "ARM")
         set(GGML_CPU_KLEIDIAI ON)
         set(GGML_OPENMP ON)
-        # Enable Vulkan GPU offload for ARM64 devices
-        set(GGML_VULKAN ON)
-        message(STATUS "Vulkan GPU offload enabled for ARM64")
+        # Vulkan disabled by default - causes crash on some devices during backend init
+        # Enable only if device is confirmed Vulkan-compatible
+        set(GGML_VULKAN OFF)
+        message(STATUS "Vulkan GPU offload disabled (CPU-only build)")
     elseif(ANDROID_ABI STREQUAL "x86_64")
         set(GGML_SYSTEM_ARCH "x86")
         set(GGML_CPU_KLEIDIAI OFF)
