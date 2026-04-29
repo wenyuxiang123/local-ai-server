@@ -164,7 +164,7 @@ class LlamaEngine @Inject constructor(
             Log.i(TAG, "Context size: $nCtx, Threads: $nThreads, nBatch: $nBatch, flashAttn: $flashAttn, cacheType: $cacheType")
             
             // 使用官方 API 加载模型，传入上下文大小和优化参数
-            engine.loadModel(path, nCtx, nBatch, flashAttn, cacheType, nGpuLayers)
+            engine.loadModel(path, nCtx, nThreads, nBatch, flashAttn, cacheType, nGpuLayers)
             
             // 如果之前有设置过 system prompt，重新设置
             if (_systemPrompt.isNotEmpty()) {

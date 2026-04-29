@@ -18,6 +18,7 @@ interface InferenceEngine {
      *
      * @param pathToModel Path to the model file
      * @param nCtx Context size for the model
+     * @param nThreads Number of threads for inference (default: 4)
      * @param nBatch Batch size for inference (default: 512)
      * @param flashAttn Enable Flash Attention (default: true)
      * @param cacheType KV cache quantization type: f16/q4_0/q5_0/q8_0 (default: q4_0)
@@ -26,6 +27,7 @@ interface InferenceEngine {
     suspend fun loadModel(
         pathToModel: String, 
         nCtx: Int = 2048,
+        nThreads: Int = 4,
         nBatch: Int = 512,
         flashAttn: Boolean = true,
         cacheType: String = "f16",

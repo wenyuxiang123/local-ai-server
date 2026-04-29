@@ -318,95 +318,159 @@
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
+                <!-- 线程数 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="线程数:"
-                        android:textSize="14sp" />
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tv_threads"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="线程数:"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_threads"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="4"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekbar_threads"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="4"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="4dp"
+                        android:max="6"
+                        android:progress="2" />
 
                 </LinearLayout>
 
+                <!-- 上下文大小 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="上下文大小:"
-                        android:textSize="14sp" />
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tv_context_size"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="上下文大小:"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_context_size"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="2048"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekbar_context_size"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="2048"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="4dp"
+                        android:max="15"
+                        android:progress="3" />
 
                 </LinearLayout>
 
+                <!-- 批大小 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="批大小:"
-                        android:textSize="14sp" />
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tv_batch_size"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="批大小:"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_batch_size"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="512"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekbar_batch_size"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="1"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="4dp"
+                        android:max="31"
+                        android:progress="7" />
 
                 </LinearLayout>
 
+                <!-- 温度 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal">
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Temperature:"
-                        android:textSize="14sp" />
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tv_temperature"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="温度:"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_temperature"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0.7"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                    </LinearLayout>
+
+                    <SeekBar
+                        android:id="@+id/seekbar_temperature"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="0.7"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="4dp"
+                        android:max="20"
+                        android:progress="7" />
 
                 </LinearLayout>
 

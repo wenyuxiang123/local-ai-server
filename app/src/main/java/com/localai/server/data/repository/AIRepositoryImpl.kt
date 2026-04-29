@@ -165,36 +165,20 @@ class AIRepositoryImpl @Inject constructor(
                 return@withContext Result.failure(Exception("模型文件不存在"))
             }
             
-            // 计算最优线程数 - 根据CPU核心数动态调整
-            val cores = Runtime.getRuntime().availableProcessors()
-            val threads = when {
-                cores >= 8 -> (cores - 2).coerceIn(4, 6)  // 8核以上留2核给系统
-                cores >= 6 -> (cores - 1).coerceIn(3, 5)  // 6核留1核
-                else -> cores.coerceIn(2, 4)
-            }
+            // 从 SharedPreferences 读取所有配置参数
+            val prefs = context.getSharedPreferences("ai_config", Context.MODE_PRIVATE)
+            val nThreads = prefs.getInt("n_threads", 4)
+            val nBatch = prefs.getInt("n_batch", 512)
+            val nCtx = prefs.getInt("n_ctx", 2048)
+            val nGpuLayers = prefs.getInt("n_gpu_layers", 0)
             
-            // 根据设备内存动态调整批处理大小
-            val memInfo = ActivityManager.MemoryInfo()
-            (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memInfo)
-            val availMemMB = memInfo.availMem / 1024 / 1024
-            
-            val nBatch = when {
-                availMemMB > 8000 -> 1024  // 8GB+ 可用，大批次
-                availMemMB > 4000 -> 512   // 4-8GB，中等
-                else -> 256                 // <4GB，小批次
-            }
-            
-            // 加载模型 - 4B 模型使用动态上下文大小和优化参数
-            val contextSize = 2048
-            Log.i(TAG, "Loading with optimization: nBatch=$nBatch, threads=$threads, availMem=${availMemMB}MB")
-            
-            val nGpuLayers = context.getSharedPreferences("ai_config", Context.MODE_PRIVATE)
-                .getInt("n_gpu_layers", 0)
+            Log.i(TAG, "Loading model with config from SharedPreferences: nThreads=$nThreads, nCtx=$nCtx, nBatch=$nBatch, nGpuLayers=$nGpuLayers")
+            FileLog.log(TAG, "Loading model with config: nThreads=$nThreads, nCtx=$nCtx, nBatch=$nBatch, nGpuLayers=$nGpuLayers")
             
             val success = engine.loadModel(
                 path = path, 
-                nCtx = contextSize, 
-                nThreads = threads,
+                nCtx = nCtx, 
+                nThreads = nThreads,
                 nBatch = nBatch,
                 flashAttn = true,
                 cacheType = "f16",
@@ -208,7 +192,7 @@ class AIRepositoryImpl @Inject constructor(
                 val config = ModelConfig(
                     name = file.nameWithoutExtension,
                     path = path,
-                    threads = threads,
+                    threads = nThreads,
                     sizeBytes = file.length(),
                     optimizationParams = com.localai.server.domain.model.OptimizationParams(
                         nBatch = nBatch,

@@ -41,6 +41,7 @@ class AIService : Service() {
         const val EXTRA_MODEL_PATH = "model_path"
         const val EXTRA_N_CTX = "n_ctx"
         const val EXTRA_N_THREADS = "n_threads"
+        const val EXTRA_N_BATCH = "n_batch"
         const val EXTRA_N_GPU_LAYERS = "n_gpu_layers"
         
         // 服务状态
@@ -74,12 +75,13 @@ class AIService : Service() {
             context.startService(intent)
         }
         
-        fun loadModel(context: Context, path: String, nCtx: Int = 2048, nThreads: Int = 4, nGpuLayers: Int = 0) {
+        fun loadModel(context: Context, path: String, nCtx: Int = 2048, nThreads: Int = 4, nBatch: Int = 512, nGpuLayers: Int = 0) {
             val intent = Intent(context, AIService::class.java).apply {
                 action = ACTION_LOAD_MODEL
                 putExtra(EXTRA_MODEL_PATH, path)
                 putExtra(EXTRA_N_CTX, nCtx)
                 putExtra(EXTRA_N_THREADS, nThreads)
+                putExtra(EXTRA_N_BATCH, nBatch)
                 putExtra(EXTRA_N_GPU_LAYERS, nGpuLayers)
             }
             context.startService(intent)
@@ -128,8 +130,9 @@ class AIService : Service() {
                 val path = intent.getStringExtra(EXTRA_MODEL_PATH)
                 val nCtx = intent.getIntExtra(EXTRA_N_CTX, 2048)
                 val nThreads = intent.getIntExtra(EXTRA_N_THREADS, 4)
+                val nBatch = intent.getIntExtra(EXTRA_N_BATCH, 512)
                 val nGpuLayers = intent.getIntExtra(EXTRA_N_GPU_LAYERS, 0)
-                path?.let { loadModelInternal(it, nCtx, nThreads, nGpuLayers) }
+                path?.let { loadModelInternal(it, nCtx, nThreads, nBatch, nGpuLayers) }
             }
         }
         
@@ -186,13 +189,13 @@ class AIService : Service() {
         }
     }
     
-    private fun loadModelInternal(path: String, nCtx: Int, nThreads: Int, nGpuLayers: Int = 0) {
+    private fun loadModelInternal(path: String, nCtx: Int, nThreads: Int, nBatch: Int, nGpuLayers: Int = 0) {
         serviceScope.launch {
             updateNotification("正在加载模型...")
             _errorMessage.value = null
             
             val success = withContext(Dispatchers.Default) {
-                engine.loadModel(path, nCtx, nThreads, nBatch = 512, flashAttn = true, cacheType = "f16", nGpuLayers = nGpuLayers)
+                engine.loadModel(path, nCtx, nThreads, nBatch, flashAttn = true, cacheType = "f16", nGpuLayers = nGpuLayers)
             }
             
             if (success) {

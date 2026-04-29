@@ -86,6 +86,7 @@ internal class InferenceEngineImpl private constructor(
     private external fun load(
         modelPath: String, 
         nCtx: Int,
+        nThreads: Int,
         nBatch: Int = 512,
         flashAttn: Boolean = true,
         cacheType: String = "f16",
@@ -157,6 +158,7 @@ internal class InferenceEngineImpl private constructor(
     override suspend fun loadModel(
         pathToModel: String, 
         nCtx: Int,
+        nThreads: Int,
         nBatch: Int,
         flashAttn: Boolean,
         cacheType: String,
@@ -174,10 +176,10 @@ internal class InferenceEngineImpl private constructor(
                     require(it.canRead()) { "Cannot read file" }
                 }
 
-                Log.i(TAG, "Loading model... \n$pathToModel, nBatch=$nBatch, flashAttn=$flashAttn, cacheType=$cacheType, nGpuLayers=$nGpuLayers")
+                Log.i(TAG, "Loading model... \n$pathToModel, nThreads=$nThreads, nBatch=$nBatch, flashAttn=$flashAttn, cacheType=$cacheType, nGpuLayers=$nGpuLayers")
                 _readyForSystemPrompt = false
                 _state.value = InferenceEngine.State.LoadingModel
-                load(pathToModel, nCtx, nBatch, flashAttn, cacheType, nGpuLayers).let {
+                load(pathToModel, nCtx, nThreads, nBatch, flashAttn, cacheType, nGpuLayers).let {
                     if (it != 0) throw UnsupportedArchitectureException()
                 }
                 prepare().let {

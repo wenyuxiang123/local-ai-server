@@ -115,9 +115,91 @@ class OptimizerFragment : Fragment() {
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
+        
+        // 线程数 SeekBar
+        binding.seekbarThreads.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val threads = progress + 2  // 范围2-8
+                binding.tvThreads.text = threads.toString()
+                if (fromUser) {
+                    val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putInt("n_threads", threads).apply()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+        
+        // 上下文大小 SeekBar
+        binding.seekbarContextSize.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val ctxSize = 512 + progress * 512  // 范围512-8192，步进512
+                binding.tvContextSize.text = ctxSize.toString()
+                if (fromUser) {
+                    val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putInt("n_ctx", ctxSize).apply()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+        
+        // 批大小 SeekBar
+        binding.seekbarBatchSize.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val batchSize = 64 + progress * 64  // 范围64-2048，步进64
+                binding.tvBatchSize.text = batchSize.toString()
+                if (fromUser) {
+                    val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putInt("n_batch", batchSize).apply()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+        
+        // 温度 SeekBar
+        binding.seekbarTemperature.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val temp = progress / 10f  // 范围0.0-2.0，步进0.1
+                binding.tvTemperature.text = String.format("%.1f", temp)
+                if (fromUser) {
+                    val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putFloat("temperature", temp).apply()
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
 
         // 从 SharedPreferences 读取初始值
         val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
+        
+        // 线程数 SeekBar
+        val savedThreads = prefs.getInt("n_threads", 4)
+        val threadsProgress = (savedThreads - 2).coerceIn(0, 6)  // 线程范围2-8
+        binding.seekbarThreads.progress = threadsProgress
+        binding.tvThreads.text = savedThreads.toString()
+        
+        // 上下文大小 SeekBar
+        val savedCtx = prefs.getInt("n_ctx", 2048)
+        val ctxProgress = ((savedCtx - 512) / 512).coerceIn(0, 15)  // 范围512-8192，步进512
+        binding.seekbarContextSize.progress = ctxProgress
+        binding.tvContextSize.text = savedCtx.toString()
+        
+        // 批大小 SeekBar
+        val savedBatch = prefs.getInt("n_batch", 512)
+        val batchProgress = (savedBatch / 64).coerceIn(0, 31)  // 范围64-2048，步进64
+        binding.seekbarBatchSize.progress = batchProgress
+        binding.tvBatchSize.text = savedBatch.toString()
+        
+        // 温度 SeekBar
+        val savedTemp = prefs.getFloat("temperature", 0.7f)
+        val tempProgress = (savedTemp * 10).toInt().coerceIn(0, 20)  // 范围0.0-2.0，步进0.1
+        binding.seekbarTemperature.progress = tempProgress
+        binding.tvTemperature.text = String.format("%.1f", savedTemp)
+        
+        // GPU层数 SeekBar
         val savedGpuLayers = prefs.getInt("n_gpu_layers", 0)
         binding.seekbarGpuLayers.progress = savedGpuLayers
         binding.tvGpuLayers.text = savedGpuLayers.toString()
@@ -213,14 +295,27 @@ class OptimizerFragment : Fragment() {
         // 从 SharedPreferences 读取配置
         val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
         
-        // TODO: 重新实现配置显示
-        // 当前暂时显示默认值
-        binding.tvThreads.text = "4"
-        binding.tvContextSize.text = "2048"
-        binding.tvBatchSize.text = "512"
-        binding.tvTemperature.text = "0.7"
-        binding.tvGpuLayers.text = prefs.getInt("n_gpu_layers", 0).toString()
-        binding.seekbarGpuLayers.progress = prefs.getInt("n_gpu_layers", 0)
+        // 读取所有参数并更新UI
+        val nThreads = prefs.getInt("n_threads", 4)
+        val nCtx = prefs.getInt("n_ctx", 2048)
+        val nBatch = prefs.getInt("n_batch", 512)
+        val temp = prefs.getFloat("temperature", 0.7f)
+        val nGpuLayers = prefs.getInt("n_gpu_layers", 0)
+        
+        binding.tvThreads.text = nThreads.toString()
+        binding.seekbarThreads.progress = (nThreads - 2).coerceIn(0, 6)
+        
+        binding.tvContextSize.text = nCtx.toString()
+        binding.seekbarContextSize.progress = ((nCtx - 512) / 512).coerceIn(0, 15)
+        
+        binding.tvBatchSize.text = nBatch.toString()
+        binding.seekbarBatchSize.progress = (nBatch / 64).coerceIn(0, 31)
+        
+        binding.tvTemperature.text = String.format("%.1f", temp)
+        binding.seekbarTemperature.progress = (temp * 10).toInt().coerceIn(0, 20)
+        
+        binding.tvGpuLayers.text = nGpuLayers.toString()
+        binding.seekbarGpuLayers.progress = nGpuLayers
     }
 
     private fun generatePatches() {

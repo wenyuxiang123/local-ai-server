@@ -46,6 +46,7 @@ static ggml_type   g_cache_type_k = GGML_TYPE_F16;
 static ggml_type   g_cache_type_v = GGML_TYPE_F16;
 static int         g_n_batch = BATCH_SIZE;
 static int         g_n_gpu_layers = 0;
+static int         g_n_threads = -1;  // -1 表示未设置，使用自动计算
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -69,11 +70,15 @@ JNIEXPORT jint JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, 
     jstring jmodel_path, 
     jint jn_ctx,
+    jint jn_threads,
     jint jn_batch,
     jboolean jflash_attn,
     jstring jcache_type,
     jint jn_gpu_layers
 ) {
+    // 保存线程数到全局变量，init_context中会使用
+    g_n_threads = jn_threads;
+    
     // 解析优化参数
     g_n_batch = (jn_batch > 0) ? jn_batch : BATCH_SIZE;
     g_flash_attn = jflash_attn;
@@ -126,11 +131,17 @@ static llama_context *init_context(llama_model *model, const int n_ctx = DEFAULT
         return nullptr;
     }
 
-    // Multi-threading setup
-    const int n_threads = std::max(N_THREADS_MIN, std::min(N_THREADS_MAX,
-                                                     (int) sysconf(_SC_NPROCESSORS_ONLN) -
-                                                     N_THREADS_HEADROOM));
-    LOGi("%s: Using %d threads", __func__, n_threads);
+    // Multi-threading setup - 如果全局变量设置了线程数则使用，否则自动计算
+    int n_threads;
+    if (g_n_threads > 0) {
+        n_threads = std::max(N_THREADS_MIN, std::min(N_THREADS_MAX, g_n_threads));
+        LOGi("%s: Using user-specified %d threads", __func__, n_threads);
+    } else {
+        n_threads = std::max(N_THREADS_MIN, std::min(N_THREADS_MAX,
+                                                 (int) sysconf(_SC_NPROCESSORS_ONLN) -
+                                                 N_THREADS_HEADROOM));
+        LOGi("%s: Using auto-calculated %d threads", __func__, n_threads);
+    }
 
     // Context parameters setup
     llama_context_params ctx_params = llama_context_default_params();
