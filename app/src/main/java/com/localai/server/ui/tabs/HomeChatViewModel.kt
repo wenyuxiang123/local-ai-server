@@ -331,7 +331,10 @@ class HomeChatViewModel @Inject constructor(
 
                     if (searchResponse.error != null) {
                         com.localai.server.util.FileLog.log("HomeChatVM", "搜索失败: " + searchResponse.error)
-                        _effect.emit(HomeChatEffect.ShowError("搜索失败: ${searchResponse.error}"))
+                        _effect.emit(HomeChatEffect.ShowError("搜索未返回结果，将使用本地知识回答"))
+                        // 搜索失败时fallback到普通发送
+                        sendNormalMessage(conversationId, content)
+                        return@launch
                     } else {
                         val searchResults = searchResponse.results.take(5)
                         // 使用 WebSearchService 的 buildSearchContext 方法确保长度限制在 800 字以内

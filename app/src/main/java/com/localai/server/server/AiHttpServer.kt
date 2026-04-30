@@ -235,7 +235,11 @@ class AiHttpServer(
      * 移除 <think...</think 块
      */
     private fun filterThinkingContent(text: String): String {
-        val filtered = text.replace(Regex("<think[\\s\\S]*?</think\\s*>", RegexOption.MULTILINE), "").trim()
+        // Remove complete <think...</think > blocks
+        var filtered = text.replace(Regex("<think[\\s\\S]*?</think\\s*>", RegexOption.MULTILINE), "")
+        // Remove unclosed <think...> block (model started thinking but never closed it)
+        // This happens when /no_think fails - the entire output is thinking content
+        filtered = filtered.replace(Regex("<think[^>]*>[\\s\\S]*"), "").trim()
         return if (filtered.isNotBlank()) filtered else text
     }
 
