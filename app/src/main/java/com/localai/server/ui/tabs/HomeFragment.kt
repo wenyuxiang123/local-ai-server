@@ -284,36 +284,37 @@ class HomeFragment : Fragment() {
     }
 
     private fun observeChatState() {
+        // 每个 Flow 需要独立的协程，否则第一个 collect 会阻塞后续的
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                // Observe messages
                 chatViewModel.messages.collect { messages ->
                     messageAdapter.submitList(messages) {
-                        // Scroll to bottom after updating list
                         if (messages.isNotEmpty()) {
                             binding.rvMessages.smoothScrollToPosition(messages.size - 1)
                         }
                     }
-                    
-                    // Update empty state
                     binding.emptyStateContainer.isVisible = messages.isEmpty()
                     binding.rvMessages.isVisible = messages.isNotEmpty()
                 }
-                
-                // Observe web search state
+            }
+        }
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
                 chatViewModel.webSearchEnabled.collect { enabled ->
                     updateWebSearchButtonState(enabled)
-                    // 更新输入框 hint
                     if (enabled) {
                         binding.etMessage.hint = "🌐 联网搜索模式..."
                     } else {
                         binding.etMessage.hint = getString(R.string.chat_hint)
                     }
                 }
-                
-                // Observe UI state (search status)
+            }
+        }
+        
+        viewLifecycleOwner.lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
                 chatViewModel.uiState.collect { state ->
-                    // 显示搜索状态
                     if (state.searchStatus != null) {
                         Toast.makeText(requireContext(), state.searchStatus, Toast.LENGTH_SHORT).show()
                     }
