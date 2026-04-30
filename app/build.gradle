@@ -14,8 +14,8 @@ android {
         applicationId "com.localai.server"
         minSdk 33
         targetSdk 35
-        versionCode 4
-        versionName "3.2-llama-official"
+        versionCode 5
+        versionName "4.0-MNN"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
@@ -25,6 +25,23 @@ android {
         
         ndk {
             abiFilters += ['arm64-v8a']
+        }
+        
+        // 外部Native构建配置
+        externalNativeBuild {
+            cmake {
+                cppFlags "-fno-rtti -fno-exceptions"
+                arguments "-DANDROID_STL=c++_shared"
+            }
+        }
+        
+        // 预编译库路径
+        sourceSets {
+            main {
+                jniLibs {
+                    srcDirs = ['src/main/jniLibs']
+                }
+            }
         }
     }
 
@@ -65,14 +82,16 @@ android {
         viewBinding true
     }
     
-    // 完全禁用资源压缩
+    // 禁用资源压缩
     aaptOptions {
         noCompress 'gguf', 'bin', 'dat', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'part', 'split'
+        noCompress 'mnn', 'json'
         cruncherEnabled = false
     }
     
     androidResources {
         noCompress 'gguf', 'bin', 'dat', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'part', 'split'
+        noCompress 'mnn', 'json'
     }
     
     packagingOptions {
@@ -85,7 +104,7 @@ android {
     }
 }
 
-// 完全禁用compressAssets任务
+// 禁用compressAssets任务
 afterEvaluate {
     tasks.matching { task ->
         task.name.contains("compressAssets") || task.name.contains("CompressAssets")
@@ -93,15 +112,14 @@ afterEvaluate {
         enabled = false
     }
     
-    // 强制禁用所有压缩相关任务
     tasks.withType(com.android.build.gradle.internal.tasks.CompressAssetsTask).configureEach {
         enabled = false
     }
 }
 
 dependencies {
-    // llama.cpp 官方 Android 绑定 - 包含完整的 native 库
-    implementation project(':llama-lib')
+    // 移除 llama-lib 依赖（MNN不需要）
+    // implementation project(':llama-lib')
     
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'

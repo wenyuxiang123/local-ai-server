@@ -66,13 +66,17 @@ class AIRepositoryImpl @Inject constructor(
         .build()
     
     override suspend fun getAvailableModels(): List<ModelConfig> = withContext(Dispatchers.IO) {
+        // MNN模型是目录结构，包含config.json
+        // 查找包含config.json的目录
         modelDir.listFiles()
-            ?.filter { it.extension == "gguf" }
-            ?.map { file ->
+            ?.filter { it.isDirectory && File(it, "config.json").exists() }
+            ?.map { dir ->
+                // 计算目录总大小
+                val totalSize = dir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
                 ModelConfig(
-                    name = file.nameWithoutExtension,
-                    path = file.absolutePath,
-                    sizeBytes = file.length()
+                    name = dir.name,
+                    path = dir.absolutePath,
+                    sizeBytes = totalSize
                 )
             }
             ?.sortedByDescending { it.sizeBytes }
@@ -143,17 +147,22 @@ class AIRepositoryImpl @Inject constructor(
     
     override suspend fun copyModelFromUri(uri: Uri): Result<File> = withContext(Dispatchers.IO) {
         try {
-            val fileName = uri.lastPathSegment?.substringAfterLast("/") 
-                ?: "model_${System.currentTimeMillis()}.gguf"
-            val targetFile = File(modelDir, fileName)
+            // MNN模型是目录结构
+            // 假设用户选择一个目录（需要支持SAF的选择目录功能）
+            val modelName = "model_${System.currentTimeMillis()}"
+            val targetDir = File(modelDir, modelName)
+            targetDir.mkdirs()
             
+            // 从URI复制文件
             context.contentResolver.openInputStream(uri)?.use { input ->
+                // 复制到目标目录的config.json
+                val targetFile = File(targetDir, "config.json")
                 targetFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
             } ?: return@withContext Result.failure(Exception("无法打开文件"))
             
-            Result.success(targetFile)
+            Result.success(targetDir)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -214,7 +223,11 @@ class AIRepositoryImpl @Inject constructor(
         try {
             val file = File(path)
             if (file.exists()) {
-                val deleted = file.delete()
+                val deleted = if (file.isDirectory) {
+                    file.deleteRecursively()
+                } else {
+                    file.delete()
+                }
                 if (deleted) Result.success(Unit) else Result.failure(Exception("删除失败"))
             } else {
                 Result.success(Unit)

@@ -34,13 +34,97 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libvulkan-dev vulkan-tools
     
-    - name: Clone llama.cpp
+    - name: Install Android NDK
       run: |
-        git clone https://github.com/ggml-org/llama.cpp.git ${GITHUB_WORKSPACE}/llama-cpp-src
-        cd ${GITHUB_WORKSPACE}/llama-cpp-src
-        git checkout 5f5e39e1ba5d
-        echo "llama.cpp checked out at known-good commit 5f5e39e1ba5d"
-        ls -la ${GITHUB_WORKSPACE}/llama-cpp-src | head -20
+        sudo apt-get update
+        sudo apt-get install -y wget unzip
+        cd /opt
+        wget -q https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+        unzip -q android-ndk-r26d-linux.zip
+        echo "ANDROID_NDK_HOME=/opt/android-ndk-r26d" >> $GITHUB_ENV
+        echo "ANDROID_NDK=/opt/android-ndk-r26d" >> $GITHUB_ENV
+    
+    - name: Clone MNN
+      run: |
+        git clone --depth 1 --branch 3.4.1 https://github.com/alibaba/MNN.git ${GITHUB_WORKSPACE}/mnn-src
+        echo "MNN cloned at version 3.4.1"
+        ls -la ${GITHUB_WORKSPACE}/mnn-src | head -15
+    
+    - name: Build MNN Libraries
+      run: |
+        cd ${GITHUB_WORKSPACE}/mnn-src
+        
+        # 创建构建目录
+        mkdir -p build_android
+        cd build_android
+        
+        # 配置CMake for Android arm64-v8a
+        cmake .. \
+          -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK}/build/cmake/android.toolchain.cmake \
+          -DANDROID_ABI=arm64-v8a \
+          -DANDROID_PLATFORM=android-24 \
+          -DANDROID_STL=c++_shared \
+          -DMNN_LOW_MEMORY=true \
+          -DMNN_CPU_WEIGHT_DEQUANT_GEMM=true \
+          -DMNN_BUILD_LLM=true \
+          -DMNN_SUPPORT_TRANSFORMER_FUSE=true \
+          -DMNN_USE_SSE=OFF \
+          -DMNN_BUILD_SHARED_LIBS=ON \
+          -DCMAKE_BUILD_TYPE=Release
+        
+        # 编译MNN和LLM库
+        make -j$(nproc) MNN MNN_Express llm
+        
+        echo "=== Build Output ==="
+        ls -la *.so 2>/dev/null || echo "No .so files in current dir"
+        find .. -name "*.so" -type f | head -20
+    
+    - name: Prepare jniLibs
+      run: |
+        # 创建jniLibs目录结构
+        mkdir -p ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
+        
+        # 复制MNN库文件
+        cd ${GITHUB_WORKSPACE}/mnn-src/build_android
+        
+        if [ -f libMNN.so ]; then
+          cp libMNN.so ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
+          echo "Copied libMNN.so"
+        else
+          echo "WARNING: libMNN.so not found"
+          find .. -name "libMNN.so" -type f
+        fi
+        
+        if [ -f libMNN_Express.so ]; then
+          cp libMNN_Express.so ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
+          echo "Copied libMNN_Express.so"
+        fi
+        
+        if [ -f libllm.so ]; then
+          cp libllm.so ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
+          echo "Copied libllm.so"
+        fi
+        
+        echo "=== jniLibs contents ==="
+        ls -la ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
+    
+    - name: Copy MNN Headers
+      run: |
+        # 创建头文件目录
+        mkdir -p ${GITHUB_WORKSPACE}/app/src/main/cpp/mnn-src/include
+        
+        # 复制MNN头文件
+        cp -r ${GITHUB_WORKSPACE}/mnn-src/include/MNN ${GITHUB_WORKSPACE}/app/src/main/cpp/mnn-src/include/
+        
+        # 复制LLM相关头文件（如果存在）
+        if [ -d "${GITHUB_WORKSPACE}/mnn-src/transformers/llm/engine/include" ]; then
+          mkdir -p ${GITHUB_WORKSPACE}/app/src/main/cpp/mnn-src/include/llm
+          cp -r ${GITHUB_WORKSPACE}/mnn-src/transformers/llm/engine/include/llm/* \
+            ${GITHUB_WORKSPACE}/app/src/main/cpp/mnn-src/include/llm/
+        fi
+        
+        echo "=== Include structure ==="
+        find ${GITHUB_WORKSPACE}/app/src/main/cpp/mnn-src/include -type f | head -20
     
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -48,13 +132,12 @@ jobs:
     - name: Build Release APK
       run: ./gradlew assembleRelease --no-daemon
       env:
-        # Pass llama.cpp source path to CMake via Gradle properties
-        LLAMA_CPP_SRC: ${{ github.workspace }}/llama-cpp-src
-        # Pass target ABI to CMake
+        MNN_SRC: ${{ github.workspace }}/mnn-src
         ANDROID_ABI: ${{ matrix.abi }}
+        ANDROID_NDK: /opt/android-ndk-r26d
     
     - name: Upload unsigned APK
       uses: actions/upload-artifact@v4
       with:
-        name: LocalAI-Server-unsigned-APK-${{ matrix.abi }}
+        name: LocalAI-Server-v4.0-MNN-unsigned-${{ matrix.abi }}
         path: app/build/outputs/apk/release/app-release-unsigned.apk
