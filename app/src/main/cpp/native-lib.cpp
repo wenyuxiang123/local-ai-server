@@ -78,6 +78,16 @@ static void tokenCallback(const std::string& token) {
 extern "C" {
 
 /**
+ * 初始化Native层（Kotlin initNative调用）
+ * 当前MNN不需要额外初始化，只需确认库加载成功
+ */
+JNIEXPORT void JNICALL
+Java_com_localai_server_engine_LlamaEngine_initNative(
+        JNIEnv* env, jobject thiz) {
+    LOGI("MNN JNI initNative called - libraries loaded successfully");
+}
+
+/**
  * 初始化JNI回调
  */
 JNIEXPORT void JNICALL
@@ -291,16 +301,19 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
         g_llm->prepare(history);
         
         int token_count = 0;
+        std::string last_output;
         while (!g_llm->stopped() && token_count < max_tokens) {
             g_llm->generate(1);  // 生成1个token
             
-            // 获取当前输出
+            // 获取当前全部输出
             std::string current = g_llm->getCurrentOutput();
-            if (!current.empty()) {
-                // 回调Kotlin
-                tokenCallback(current);
-                full_output += current;
+            if (current.size() > last_output.size()) {
+                // 只发送增量部分
+                std::string delta = current.substr(last_output.size());
+                tokenCallback(delta);
+                full_output += delta;
             }
+            last_output = current;
             
             token_count++;
         }

@@ -44,5 +44,5 @@ target_link_libraries(localai-jni
 )
 
 # 编译选项
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
