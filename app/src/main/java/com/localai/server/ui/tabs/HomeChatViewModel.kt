@@ -342,7 +342,7 @@ class HomeChatViewModel @Inject constructor(
                             "未找到相关结果"
                         }
                         _uiState.update { it.copy(searchStatus = statusMsg })
-                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索完成: $statusMsg, 上下文长度=${searchContext.length}")
+                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索完成: " + statusMsg + ", 上下文长度=" + searchContext.length)
 
                         // 使用搜索上下文发送消息
                         sendMessageWithContext(conversationId, content, searchContext, searchResults.map { it.url })
