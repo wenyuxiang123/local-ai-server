@@ -38,7 +38,7 @@ class AIRepositoryImpl @Inject constructor(
         File(context.filesDir, "models").apply { mkdirs() }
     }
     
-    // 内置模型文件名 - DeepSeek-R1-Distill-Qwen-14B
+    // 内置模型文件名 - Qwen3-4B-Q3_K_M
     private val builtInModelName = modelExtractor.getModelFileName()
     
     override fun isBuiltInModelReady(): Boolean {

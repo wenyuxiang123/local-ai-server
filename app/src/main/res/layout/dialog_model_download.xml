@@ -20,7 +20,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Qwen3-4B-Q4_K_M"
+        android:text="Qwen3-4B-Q3_K_M"
         android:textSize="12sp"
         android:textColor="@color/text_secondary" />
 
@@ -55,7 +55,7 @@
             android:id="@+id/tv_size"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="0 MB / 4400 MB"
+            android:text="0 MB / 2300 MB"
             android:textSize="11sp"
             android:textColor="@color/text_secondary" />
 

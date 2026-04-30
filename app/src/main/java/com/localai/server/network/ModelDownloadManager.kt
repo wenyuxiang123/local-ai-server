@@ -38,37 +38,35 @@ class ModelDownloadManager @Inject constructor(
         const val STATUS_COMPLETED = 3
         const val STATUS_FAILED = 4
         
-        // 备用下载源
+        // 备用下载源 - Qwen3 系列模型
         private val MODEL_SOURCES = mapOf(
-            "DeepSeek-R1-Distill-Qwen-1.5B-Q8_0" to listOf(
-                "https://modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/master/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf",
-                "https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf"
-            ),
-            "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M" to listOf(
-                "https://modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/master/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
-                "https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"
-            ),
-            "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M" to listOf(
-                "https://modelscope.cn/models/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/master/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf",
-                "https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
-            ),
-            "Qwen3-1.7B-Q4_K_M" to listOf(
-                "https://modelscope.cn/api/v1/models/unsloth/Qwen3-1.7B-GGUF/resolve/master/Qwen3-1.7B-Q4_K_M.gguf",
-                "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf"
-            ),
-            "Qwen3-0.6B-Q4_K_M" to listOf(
-                "https://modelscope.cn/api/v1/models/unsloth/Qwen3-0.6B-GGUF/resolve/master/Qwen3-0.6B-Q4_K_M.gguf",
-                "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf"
+            // Qwen3-4B 系列
+            "Qwen3-4B-Q3_K_M" to listOf(
+                "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q3_K_M.gguf",
+                "https://modelscope.cn/api/v1/models/unsloth/Qwen3-4B-GGUF/repo?Revision=master&FilePath=Qwen3-4B-Q3_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q3_K_M.gguf"
             ),
             "Qwen3-4B-Q4_K_M" to listOf(
                 "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q4_K_M.gguf",
                 "https://modelscope.cn/api/v1/models/unsloth/Qwen3-4B-GGUF/repo?Revision=master&FilePath=Qwen3-4B-Q4_K_M.gguf",
                 "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
             ),
-            "Qwen3-4B-Q3_K_M" to listOf(
-                "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q3_K_M.gguf",
-                "https://modelscope.cn/api/v1/models/unsloth/Qwen3-4B-GGUF/repo?Revision=master&FilePath=Qwen3-4B-Q3_K_M.gguf",
-                "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q3_K_M.gguf"
+            // Qwen3-1.7B 系列
+            "Qwen3-1.7B-Q3_K_M" to listOf(
+                "https://modelscope.cn/models/unsloth/Qwen3-1.7B-GGUF/resolve/master/Qwen3-1.7B-Q3_K_M.gguf",
+                "https://modelscope.cn/api/v1/models/unsloth/Qwen3-1.7B-GGUF/repo?Revision=master&FilePath=Qwen3-1.7B-Q3_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q3_K_M.gguf"
+            ),
+            "Qwen3-1.7B-Q4_K_M" to listOf(
+                "https://modelscope.cn/models/unsloth/Qwen3-1.7B-GGUF/resolve/master/Qwen3-1.7B-Q4_K_M.gguf",
+                "https://modelscope.cn/api/v1/models/unsloth/Qwen3-1.7B-GGUF/repo?Revision=master&FilePath=Qwen3-1.7B-Q4_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf"
+            ),
+            // Qwen2.5 系列（兼容版）
+            "Qwen2.5-3B-Instruct-Q4_K_M" to listOf(
+                "https://modelscope.cn/models/unsloth/Qwen2.5-3B-Instruct-GGUF/resolve/master/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+                "https://modelscope.cn/api/v1/models/unsloth/Qwen2.5-3B-Instruct-GGUF/repo?Revision=master&FilePath=Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf"
             )
         )
         

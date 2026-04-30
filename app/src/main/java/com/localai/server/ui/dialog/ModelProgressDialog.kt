@@ -19,6 +19,7 @@ class ModelProgressDialog(private val context: Context) {
     private var currentDialog: Dialog? = null
     private var currentType: DialogType? = null
     private var isShowing = false  // 添加状态标志，防止竞态条件
+    private var currentModelName: String = ""  // 当前下载的模型名称
     
     private val decimalFormat = DecimalFormat("#.#")
 
@@ -27,6 +28,19 @@ class ModelProgressDialog(private val context: Context) {
         WAITING,     // 等待加载模型
         LOADING      // 加载中
     }
+
+    /**
+     * 设置要下载的模型名称
+     * 必须在调用 show() 之前调用
+     */
+    fun setModelName(modelName: String) {
+        currentModelName = modelName
+    }
+    
+    /**
+     * 获取当前设置的模型名称
+     */
+    fun getModelName(): String = currentModelName
 
     @Synchronized
     fun show(type: DialogType) {
@@ -86,7 +100,12 @@ class ModelProgressDialog(private val context: Context) {
     }
 
     private fun createDownloadView(): View {
-        return LayoutInflater.from(context).inflate(R.layout.dialog_model_download, null)
+        val view = LayoutInflater.from(context).inflate(R.layout.dialog_model_download, null)
+        // 设置模型名称
+        if (currentModelName.isNotEmpty()) {
+            view.findViewById<TextView>(R.id.tv_model_name)?.text = currentModelName
+        }
+        return view
     }
 
     private fun createLoadingView(title: String): View {
@@ -102,10 +121,18 @@ class ModelProgressDialog(private val context: Context) {
         percent: Int,
         downloadedBytes: Long,
         totalBytes: Long,
-        speedBytesPerSec: Long
+        speedBytesPerSec: Long,
+        modelName: String? = null
     ) {
         if (currentType != DialogType.DOWNLOAD) return
         if (!isShowing || currentDialog?.isShowing != true) return
+        
+        // 如果传入了新的模型名称，更新显示
+        modelName?.let {
+            if (it.isNotEmpty()) {
+                currentDialog?.findViewById<TextView>(R.id.tv_model_name)?.text = it
+            }
+        }
         
         currentDialog?.findViewById<TextView>(R.id.tv_percent)?.text = "$percent%"
         currentDialog?.findViewById<ProgressBar>(R.id.progress_bar)?.progress = percent

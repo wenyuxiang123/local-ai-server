@@ -259,6 +259,16 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
+            <!-- 联网搜索按钮 - 移至最左侧 -->
+            <ImageButton
+                android:id="@+id/btn_web_search"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_search"
+                app:tint="@color/text_secondary"
+                android:contentDescription="@string/web_search" />
+
             <!-- 添加附件按钮 -->
             <ImageButton
                 android:id="@+id/btn_upload"
@@ -289,16 +299,6 @@
                 android:maxLines="4"
                 android:gravity="center_vertical"
                 android:imeOptions="actionSend" />
-
-            <!-- 联网搜索按钮 -->
-            <ImageButton
-                android:id="@+id/btn_web_search"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@android:drawable/ic_menu_manage"
-                app:tint="@color/text_secondary"
-                android:contentDescription="@string/web_search" />
 
             <!-- 发送按钮 -->
             <ImageButton

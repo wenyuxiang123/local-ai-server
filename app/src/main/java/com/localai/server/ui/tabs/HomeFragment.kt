@@ -27,7 +27,9 @@ import com.localai.server.ui.chat.MessageAdapter
 import com.localai.server.ui.dialog.ModelProgressDialog
 import com.localai.server.ui.main.LoadingPhase
 import com.localai.server.ui.main.MainViewModel
+import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.launch
 
 /**
@@ -47,6 +49,9 @@ class HomeFragment : Fragment() {
 
     // 主 ViewModel（用于服务状态）
     private val mainViewModel: MainViewModel by activityViewModels()
+
+    // ModelExtractor 用于获取模型名称 (Hilt 注入)
+    private val modelExtractor: ModelExtractor by viewModels()
 
     private lateinit var messageAdapter: MessageAdapter
 
@@ -340,6 +345,9 @@ class HomeFragment : Fragment() {
                         LoadingPhase.DOWNLOADING -> {
                             if (modelProgressDialog == null) {
                                 modelProgressDialog = ModelProgressDialog(requireContext())
+                                // 设置要下载的模型名称
+                                val modelName = modelExtractor.getModelFileName().removeSuffix(".gguf")
+                                modelProgressDialog?.setModelName(modelName)
                             }
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.DOWNLOAD)
                             modelProgressDialog?.updateDownloadProgress(
@@ -352,6 +360,9 @@ class HomeFragment : Fragment() {
                         LoadingPhase.WAITING -> {
                             if (modelProgressDialog == null) {
                                 modelProgressDialog = ModelProgressDialog(requireContext())
+                                // 设置要下载的模型名称
+                                val modelName = modelExtractor.getModelFileName().removeSuffix(".gguf")
+                                modelProgressDialog?.setModelName(modelName)
                             }
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.WAITING)
                             modelProgressDialog?.updateLoadingProgress(state.progress, state.logMessages)
@@ -359,6 +370,9 @@ class HomeFragment : Fragment() {
                         LoadingPhase.LOADING -> {
                             if (modelProgressDialog == null) {
                                 modelProgressDialog = ModelProgressDialog(requireContext())
+                                // 设置要下载的模型名称
+                                val modelName = modelExtractor.getModelFileName().removeSuffix(".gguf")
+                                modelProgressDialog?.setModelName(modelName)
                             }
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.LOADING)
                             modelProgressDialog?.updateLoadingProgress(state.progress, state.logMessages)
