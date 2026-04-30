@@ -16,5 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "LocalAI-Server"
 include ':app'
-# 移除 llama-lib（MNN版本不需要）
-# include ':llama-lib'
+// 移除 llama-lib（MNN版本不需要）
+// include ':llama-lib'
