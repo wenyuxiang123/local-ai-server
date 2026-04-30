@@ -74,12 +74,14 @@ class WebSearchService @Inject constructor(
     suspend fun search(query: String): SearchResponse = withContext(Dispatchers.IO) {
         try {
             Log.i(TAG, "Searching for: $query with multi-source fallback")
+            com.localai.server.util.FileLog.log(TAG, "开始搜索: $query")
             
             // 按顺序尝试各搜索源，任一源返回 >= 1 条结果即停止
             // 1. 尝试百度
             val baiduResults = searchWithBaidu(query)
             if (baiduResults.isNotEmpty()) {
                 Log.i(TAG, "Baidu returned ${baiduResults.size} results")
+                com.localai.server.util.FileLog.log(TAG, "百度搜索返回 ${baiduResults.size} 条结果")
                 return@withContext SearchResponse(query, baiduResults)
             }
             
@@ -87,6 +89,7 @@ class WebSearchService @Inject constructor(
             val bingResults = searchWithBingCN(query)
             if (bingResults.isNotEmpty()) {
                 Log.i(TAG, "Bing CN returned ${bingResults.size} results")
+                com.localai.server.util.FileLog.log(TAG, "必应搜索返回 ${bingResults.size} 条结果")
                 return@withContext SearchResponse(query, bingResults)
             }
             
@@ -94,11 +97,13 @@ class WebSearchService @Inject constructor(
             val ddgResults = searchWithDuckDuckGo(query)
             if (ddgResults.isNotEmpty()) {
                 Log.i(TAG, "DuckDuckGo returned ${ddgResults.size} results")
+                com.localai.server.util.FileLog.log(TAG, "DuckDuckGo搜索返回 ${ddgResults.size} 条结果")
                 return@withContext SearchResponse(query, ddgResults)
             }
             
             // 所有源都无结果
             Log.w(TAG, "All search sources returned empty results")
+            com.localai.server.util.FileLog.log(TAG, "所有搜索源都未返回结果")
             SearchResponse(query, emptyList(), error = "所有搜索源都未返回结果")
             
         } catch (e: Exception) {

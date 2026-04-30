@@ -90,6 +90,7 @@ class HomeChatViewModel @Inject constructor(
      */
     fun toggleWebSearch() {
         _webSearchEnabled.value = !_webSearchEnabled.value
+        com.localai.server.util.FileLog.log("HomeChatVM", "联网搜索开关: ${_webSearchEnabled.value}")
     }
 
     /**
@@ -104,6 +105,7 @@ class HomeChatViewModel @Inject constructor(
      */
     fun toggleThinkMode() {
         _thinkModeEnabled.value = !_thinkModeEnabled.value
+        com.localai.server.util.FileLog.log("HomeChatVM", "思考模式开关: ${_thinkModeEnabled.value}")
     }
 
     /**
@@ -323,10 +325,12 @@ class HomeChatViewModel @Inject constructor(
                 // 如果启用联网搜索，先搜索再发送
                 if (_webSearchEnabled.value) {
                     _uiState.update { it.copy(searchStatus = "🔍 正在搜索...") }
+                    com.localai.server.util.FileLog.log("HomeChatVM", "联网搜索已启用，开始搜索: $content")
 
                     val searchResponse = webSearchService.search(content)
 
                     if (searchResponse.error != null) {
+                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索失败: ${searchResponse.error}")
                         _effect.emit(HomeChatEffect.ShowError("搜索失败: ${searchResponse.error}"))
                     } else {
                         val searchResults = searchResponse.results.take(5)
@@ -337,7 +341,8 @@ class HomeChatViewModel @Inject constructor(
                         } else {
                             "未找到相关结果"
                         }
-                        _uiState.update { it.copy(searchStatus = statusMsg) }
+                        _uiState.update { it.copy(searchStatus = statusMsg })
+                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索完成: $statusMsg, 上下文长度=${searchContext.length}")
 
                         // 使用搜索上下文发送消息
                         sendMessageWithContext(conversationId, content, searchContext, searchResults.map { it.url })

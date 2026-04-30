@@ -142,6 +142,7 @@ class HomeFragment : Fragment() {
 
         // 联网搜索按钮
         binding.btnWebSearch.setOnClickListener {
+            com.localai.server.util.FileLog.log("HomeFragment", "联网搜索按钮被点击")
             chatViewModel.toggleWebSearch()
         }
 
@@ -327,6 +328,7 @@ class HomeFragment : Fragment() {
      * 更新联网搜索按钮状态
      */
     private fun updateWebSearchButtonState(enabled: Boolean) {
+        com.localai.server.util.FileLog.log("HomeFragment", "联网按钮状态更新: enabled=$enabled")
         val tintColor = if (enabled) {
             // 高亮：绿色
             ContextCompat.getColor(requireContext(), R.color.status_online)
