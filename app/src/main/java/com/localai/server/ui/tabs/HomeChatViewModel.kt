@@ -90,7 +90,7 @@ class HomeChatViewModel @Inject constructor(
      */
     fun toggleWebSearch() {
         _webSearchEnabled.value = !_webSearchEnabled.value
-        com.localai.server.util.FileLog.log("HomeChatVM", "联网搜索开关: ${_webSearchEnabled.value}")
+        com.localai.server.util.FileLog.log("HomeChatVM", "联网搜索开关: " + _webSearchEnabled.value)
     }
 
     /**
@@ -105,7 +105,7 @@ class HomeChatViewModel @Inject constructor(
      */
     fun toggleThinkMode() {
         _thinkModeEnabled.value = !_thinkModeEnabled.value
-        com.localai.server.util.FileLog.log("HomeChatVM", "思考模式开关: ${_thinkModeEnabled.value}")
+        com.localai.server.util.FileLog.log("HomeChatVM", "思考模式开关: " + _thinkModeEnabled.value)
     }
 
     /**
@@ -324,20 +324,20 @@ class HomeChatViewModel @Inject constructor(
 
                 // 如果启用联网搜索，先搜索再发送
                 if (_webSearchEnabled.value) {
-                    _uiState.update { it.copy(searchStatus = "🔍 正在搜索...") }
-                    com.localai.server.util.FileLog.log("HomeChatVM", "联网搜索已启用，开始搜索: $content")
+                    _uiState.update { it.copy(searchStatus = "正在搜索...") }
+                    com.localai.server.util.FileLog.log("HomeChatVM", "联网搜索已启用，开始搜索: " + content)
 
                     val searchResponse = webSearchService.search(content)
 
                     if (searchResponse.error != null) {
-                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索失败: ${searchResponse.error}")
+                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索失败: " + searchResponse.error)
                         _effect.emit(HomeChatEffect.ShowError("搜索失败: ${searchResponse.error}"))
                     } else {
                         val searchResults = searchResponse.results.take(5)
                         // 使用 WebSearchService 的 buildSearchContext 方法确保长度限制在 800 字以内
                         val searchContext = webSearchService.buildSearchContext(searchResults)
                         val statusMsg = if (searchResults.isNotEmpty()) {
-                            "🔍 找到 ${searchResults.size} 条结果"
+                            "找到 " + searchResults.size + " 条结果"
                         } else {
                             "未找到相关结果"
                         }
