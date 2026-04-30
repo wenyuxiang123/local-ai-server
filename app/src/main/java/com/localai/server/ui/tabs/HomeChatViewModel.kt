@@ -335,12 +335,15 @@ class HomeChatViewModel @Inject constructor(
                     // WebView搜索无结果时降级到OkHttp
                     if (searchResponse.results.isEmpty()) {
                         com.localai.server.util.FileLog.log("HomeChatVM", "WebView搜索无结果，降级到OkHttp搜索")
-                        searchResponse = webSearchService.search(content)
+                        val okhttpResponse = webSearchService.search(content)
+                        if (okhttpResponse.results.isNotEmpty()) {
+                            searchResponse = okhttpResponse
+                        }
                     }
                     
                     val searchResults = searchResponse.results.take(5)
                     // 使用 WebViewSearchService 的 buildSearchContext 方法确保长度限制在 800 字以内
-                    val searchContext = webViewSearchService.buildSearchContext(searchResults)
+                    val searchContext = webSearchService.buildSearchContext(searchResults)
                     val statusMsg = if (searchResults.isNotEmpty()) {
                         "找到 " + searchResults.size + " 条结果"
                     } else {
