@@ -294,8 +294,41 @@ class HomeFragment : Fragment() {
                     binding.emptyStateContainer.isVisible = messages.isEmpty()
                     binding.rvMessages.isVisible = messages.isNotEmpty()
                 }
+                
+                // Observe web search state
+                chatViewModel.webSearchEnabled.collect { enabled ->
+                    updateWebSearchButtonState(enabled)
+                    // 更新输入框 hint
+                    if (enabled) {
+                        binding.etMessage.hint = "🌐 联网搜索模式..."
+                    } else {
+                        binding.etMessage.hint = getString(R.string.chat_hint)
+                    }
+                }
+                
+                // Observe UI state (search status)
+                chatViewModel.uiState.collect { state ->
+                    // 显示搜索状态
+                    if (state.searchStatus != null) {
+                        Toast.makeText(requireContext(), state.searchStatus, Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
+    }
+    
+    /**
+     * 更新联网搜索按钮状态
+     */
+    private fun updateWebSearchButtonState(enabled: Boolean) {
+        val tintColor = if (enabled) {
+            // 高亮：绿色
+            ContextCompat.getColor(requireContext(), R.color.status_online)
+        } else {
+            // 灰色
+            ContextCompat.getColor(requireContext(), R.color.text_secondary)
+        }
+        binding.btnWebSearch.setColorFilter(tintColor)
     }
 
     private fun observeMainState() {

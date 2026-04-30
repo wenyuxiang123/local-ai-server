@@ -320,28 +320,22 @@ class HomeChatViewModel @Inject constructor(
 
                 // 如果启用联网搜索，先搜索再发送
                 if (_webSearchEnabled.value) {
-                    _uiState.update { it.copy(searchStatus = "正在搜索...") }
+                    _uiState.update { it.copy(searchStatus = "🔍 正在搜索...") }
 
                     val searchResponse = webSearchService.search(content)
 
                     if (searchResponse.error != null) {
                         _effect.emit(HomeChatEffect.ShowError("搜索失败: ${searchResponse.error}"))
                     } else {
-                        val searchResults = searchResponse.results.take(3)
-                        val searchContext = if (searchResults.isNotEmpty()) {
-                            buildString {
-                                appendLine("请基于以下搜索结果回答用户问题：")
-                                searchResults.forEachIndexed { index, result ->
-                                    appendLine("${index + 1}. ${result.title}")
-                                    appendLine("   ${result.snippet}")
-                                    appendLine("   来源: ${result.url}")
-                                    appendLine()
-                                }
-                            }
+                        val searchResults = searchResponse.results.take(5)
+                        // 使用 WebSearchService 的 buildSearchContext 方法确保长度限制在 800 字以内
+                        val searchContext = webSearchService.buildSearchContext(searchResults)
+                        val statusMsg = if (searchResults.isNotEmpty()) {
+                            "🔍 找到 ${searchResults.size} 条结果"
                         } else {
-                            ""
+                            "未找到相关结果"
                         }
-                        _uiState.update { it.copy(searchStatus = "搜索完成，找到 ${searchResults.size} 条结果") }
+                        _uiState.update { it.copy(searchStatus = statusMsg) }
 
                         // 使用搜索上下文发送消息
                         sendMessageWithContext(conversationId, content, searchContext, searchResults.map { it.url })
