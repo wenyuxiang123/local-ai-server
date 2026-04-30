@@ -318,6 +318,8 @@ class HomeChatViewModel @Inject constructor(
                 // Update UI state
                 _uiState.update { it.copy(isLoading = true, error = null) }
 
+                android.util.Log.i("HomeChatVM", "sendMessageInternal: webSearchEnabled=${_webSearchEnabled.value}, content=$content")
+
                 // 如果启用联网搜索，先搜索再发送
                 if (_webSearchEnabled.value) {
                     _uiState.update { it.copy(searchStatus = "🔍 正在搜索...") }

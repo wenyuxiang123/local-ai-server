@@ -174,12 +174,17 @@ class ChatApiService @Inject constructor() {
     
     // Build messages for API from database messages
     fun buildMessages(userContent: String, historyMessages: List<ChatMessage>, thinkMode: Boolean = false): List<ChatMessage> {
-        val allMessages = historyMessages.toMutableList()
+        val allMessages = mutableListOf<ChatMessage>()
         
-        // 根据思考模式设置系统提示词
-        if (allMessages.isEmpty()) {
-            val thinkTag = if (thinkMode) " /think" else " /no_think"
-            allMessages.add(ChatMessage("system", "You are a helpful assistant.$thinkTag"))
+        // 始终在开头添加系统提示词（控制思考模式）
+        val thinkTag = if (thinkMode) " /think" else " /no_think"
+        allMessages.add(ChatMessage("system", "You are a helpful assistant.$thinkTag"))
+        
+        // 添加历史消息（跳过已有的 system 消息，避免重复）
+        historyMessages.forEach { msg ->
+            if (msg.role != "system") {
+                allMessages.add(msg)
+            }
         }
         
         allMessages.add(ChatMessage("user", userContent))
