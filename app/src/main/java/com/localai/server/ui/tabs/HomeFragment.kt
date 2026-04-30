@@ -29,7 +29,6 @@ import com.localai.server.ui.main.LoadingPhase
 import com.localai.server.ui.main.MainViewModel
 import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.launch
 
 /**
@@ -51,7 +50,7 @@ class HomeFragment : Fragment() {
     private val mainViewModel: MainViewModel by activityViewModels()
 
     // ModelExtractor 用于获取模型名称 (Hilt 注入)
-    private val modelExtractor: ModelExtractor by viewModels()
+    @Inject lateinit var modelExtractor: ModelExtractor
 
     private lateinit var messageAdapter: MessageAdapter
 
