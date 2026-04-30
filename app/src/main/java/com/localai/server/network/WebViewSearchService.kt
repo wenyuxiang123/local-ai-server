@@ -143,7 +143,7 @@ class WebViewSearchService @Inject constructor(
 
     // 解析必应搜索结果
     private fun parseBingResults(html: String): List<WebSearchService.SearchResult> {
-        val results = mutableListOf<SearchResult>()
+        val results = mutableListOf<WebSearchService.SearchResult>()
         try {
             // 必应结果在 class="b_algo" 的 li 中
             val algoPattern = Regex("""class="[^"]*b_algo[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>.*?(?:<p[^>]*>(.*?)</p>)?""", RegexOption.DOT_MATCHES_ALL)
@@ -163,7 +163,7 @@ class WebViewSearchService @Inject constructor(
 
     // 解析DuckDuckGo搜索结果
     private fun parseDuckDuckGoResults(html: String): List<WebSearchService.SearchResult> {
-        val results = mutableListOf<SearchResult>()
+        val results = mutableListOf<WebSearchService.SearchResult>()
         try {
             val resultPattern = Regex("""class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>.*?class="result__snippet"[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
             for (match in resultPattern.findAll(html).take(5)) {
@@ -180,7 +180,7 @@ class WebViewSearchService @Inject constructor(
                 for (match in fallbackPattern.findAll(html).take(5)) {
                     val url = match.groupValues[1].trim()
                     val title = match.groupValues[2].replace(Regex("<[^>]+>"), "").trim()
-                    if (url.isNotEmpty() && title.isNotEmpty() && results.none { it.url == url }) {
+                    if (url.isNotEmpty() && title.isNotEmpty() && results.none { r: WebSearchService.SearchResult -> r.url == url }) {
                         results.add(WebSearchService.SearchResult(title, url, "", "DuckDuckGo"))
                     }
                 }
@@ -193,7 +193,7 @@ class WebViewSearchService @Inject constructor(
 
     // 解析百度搜索结果
     private fun parseBaiduResults(html: String): List<WebSearchService.SearchResult> {
-        val results = mutableListOf<SearchResult>()
+        val results = mutableListOf<WebSearchService.SearchResult>()
         try {
             val titlePattern = Regex("""class="[^"]*c-title[^"]*"[^>]*>.*?<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>""", RegexOption.DOT_MATCHES_ALL)
             for (match in titlePattern.findAll(html).take(5)) {
@@ -209,7 +209,7 @@ class WebViewSearchService @Inject constructor(
                 for (match in fallbackPattern.findAll(html).take(5)) {
                     val url = match.groupValues[1].trim()
                     val title = match.groupValues[2].replace(Regex("<[^>]+>"), "").trim()
-                    if (url.isNotEmpty() && title.isNotEmpty() && results.none { it.url == url }) {
+                    if (url.isNotEmpty() && title.isNotEmpty() && results.none { r: WebSearchService.SearchResult -> r.url == url }) {
                         results.add(WebSearchService.SearchResult(title, url, "", "百度"))
                     }
                 }
