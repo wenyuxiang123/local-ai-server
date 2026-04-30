@@ -41,8 +41,8 @@ class AIService : Service() {
         const val EXTRA_MODEL_PATH = "model_path"
         const val EXTRA_N_CTX = "n_ctx"
         const val EXTRA_N_THREADS = "n_threads"
-        const val EXTRA_N_BATCH = "n_batch"
-        const val EXTRA_N_GPU_LAYERS = "n_gpu_layers"
+        const val EXTRA_N_BATCH = "n_batch"  // [Deprecated] MNN不使用此参数
+        const val EXTRA_N_GPU_LAYERS = "n_gpu_layers"  // [Deprecated] MNN不使用此参数
         
         // 服务状态
         private val _isRunning = MutableStateFlow(false)
@@ -130,8 +130,9 @@ class AIService : Service() {
                 val path = intent.getStringExtra(EXTRA_MODEL_PATH)
                 val nCtx = intent.getIntExtra(EXTRA_N_CTX, 2048)
                 val nThreads = intent.getIntExtra(EXTRA_N_THREADS, 4)
-                val nBatch = intent.getIntExtra(EXTRA_N_BATCH, 512)
-                val nGpuLayers = intent.getIntExtra(EXTRA_N_GPU_LAYERS, 0)
+                val nBatch = intent.getIntExtra(EXTRA_N_BATCH, 512)  // [Deprecated] MNN不使用
+                val nGpuLayers = intent.getIntExtra(EXTRA_N_GPU_LAYERS, 0)  // [Deprecated] MNN不使用
+                Log.w(TAG, "loadModel: nBatch=$nBatch, nGpuLayers=$nGpuLayers - [Deprecated] MNN不使用这些参数")
                 path?.let { loadModelInternal(it, nCtx, nThreads, nBatch, nGpuLayers) }
             }
         }

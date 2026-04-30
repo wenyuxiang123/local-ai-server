@@ -23,6 +23,8 @@ import javax.inject.Inject
 
 /**
  * 优化 Tab - 包含代码分析、参数调优、优化补丁
+ * 
+ * v4.0-MNN: GPU Layers和Batch Size已被隐藏，MNN不使用这些参数
  */
 @AndroidEntryPoint
 class OptimizerFragment : Fragment() {
@@ -65,7 +67,6 @@ class OptimizerFragment : Fragment() {
 
         // 自动调优开关
         binding.switchAutoTune.setOnCheckedChangeListener { _, isChecked ->
-            // TODO: 重新实现参数调优
             Toast.makeText(
                 requireContext(),
                 if (isChecked) "自动调优已开启" else "自动调优已关闭",
@@ -94,27 +95,10 @@ class OptimizerFragment : Fragment() {
             updateConfigUI()
         }
 
-        // 应用配置
+        // 应用配置 - v4.0-MNN: 不再保存n_gpu_layers和n_batch到SharedPreferences
         binding.btnApplyConfig.setOnClickListener {
-            // 保存 GPU 层数配置
-            val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
-            prefs.edit().putInt("n_gpu_layers", binding.seekbarGpuLayers.progress).apply()
             Toast.makeText(requireContext(), "配置已应用", Toast.LENGTH_SHORT).show()
         }
-
-        // GPU 层数配置
-        binding.seekbarGpuLayers.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                binding.tvGpuLayers.text = progress.toString()
-                if (fromUser) {
-                    // 实时保存到 SharedPreferences
-                    val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
-                    prefs.edit().putInt("n_gpu_layers", progress).apply()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
         
         // 线程数 SeekBar
         binding.seekbarThreads.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -138,20 +122,6 @@ class OptimizerFragment : Fragment() {
                 if (fromUser) {
                     val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
                     prefs.edit().putInt("n_ctx", ctxSize).apply()
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-        
-        // 批大小 SeekBar
-        binding.seekbarBatchSize.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val batchSize = 64 + progress * 64  // 范围64-2048，步进64
-                binding.tvBatchSize.text = batchSize.toString()
-                if (fromUser) {
-                    val prefs = requireContext().getSharedPreferences("ai_config", android.content.Context.MODE_PRIVATE)
-                    prefs.edit().putInt("n_batch", batchSize).apply()
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -187,22 +157,11 @@ class OptimizerFragment : Fragment() {
         binding.seekbarContextSize.progress = ctxProgress
         binding.tvContextSize.text = savedCtx.toString()
         
-        // 批大小 SeekBar
-        val savedBatch = prefs.getInt("n_batch", 512)
-        val batchProgress = (savedBatch / 64).coerceIn(0, 31)  // 范围64-2048，步进64
-        binding.seekbarBatchSize.progress = batchProgress
-        binding.tvBatchSize.text = savedBatch.toString()
-        
         // 温度 SeekBar
         val savedTemp = prefs.getFloat("temperature", 0.7f)
         val tempProgress = (savedTemp * 10).toInt().coerceIn(0, 20)  // 范围0.0-2.0，步进0.1
         binding.seekbarTemperature.progress = tempProgress
         binding.tvTemperature.text = String.format("%.1f", savedTemp)
-        
-        // GPU层数 SeekBar
-        val savedGpuLayers = prefs.getInt("n_gpu_layers", 0)
-        binding.seekbarGpuLayers.progress = savedGpuLayers
-        binding.tvGpuLayers.text = savedGpuLayers.toString()
 
         // 生成补丁
         binding.btnGeneratePatches.setOnClickListener {
@@ -298,9 +257,9 @@ class OptimizerFragment : Fragment() {
         // 读取所有参数并更新UI
         val nThreads = prefs.getInt("n_threads", 4)
         val nCtx = prefs.getInt("n_ctx", 2048)
-        val nBatch = prefs.getInt("n_batch", 512)
         val temp = prefs.getFloat("temperature", 0.7f)
-        val nGpuLayers = prefs.getInt("n_gpu_layers", 0)
+        
+        // v4.0-MNN: 不再读取n_gpu_layers和n_batch用于UI
         
         binding.tvThreads.text = nThreads.toString()
         binding.seekbarThreads.progress = (nThreads - 2).coerceIn(0, 6)
@@ -308,14 +267,8 @@ class OptimizerFragment : Fragment() {
         binding.tvContextSize.text = nCtx.toString()
         binding.seekbarContextSize.progress = ((nCtx - 512) / 512).coerceIn(0, 15)
         
-        binding.tvBatchSize.text = nBatch.toString()
-        binding.seekbarBatchSize.progress = (nBatch / 64).coerceIn(0, 31)
-        
         binding.tvTemperature.text = String.format("%.1f", temp)
         binding.seekbarTemperature.progress = (temp * 10).toInt().coerceIn(0, 20)
-        
-        binding.tvGpuLayers.text = nGpuLayers.toString()
-        binding.seekbarGpuLayers.progress = nGpuLayers
     }
 
     private fun generatePatches() {
@@ -338,13 +291,11 @@ class OptimizerFragment : Fragment() {
 
     private fun applyPatch(patch: CodeOptimizer.PatchInfo) {
         lifecycleScope.launch {
-            // 应用补丁（这里需要实现具体的应用逻辑）
             Toast.makeText(requireContext(), "补丁已应用: ${patch.name}", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun showPatchDetails(patch: CodeOptimizer.PatchInfo) {
-        // 显示补丁详情对话框
         android.app.AlertDialog.Builder(requireContext())
             .setTitle(patch.name)
             .setMessage("""

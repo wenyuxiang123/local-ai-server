@@ -31,7 +31,7 @@ android {
         externalNativeBuild {
             cmake {
                 path file('src/main/cpp/CMakeLists.txt')
-                cppFlags "-fno-rtti -fno-exceptions"
+                cppFlags "-fno-rtti"
                 arguments "-DANDROID_STL=c++_shared"
             }
         }

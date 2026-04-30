@@ -396,12 +396,13 @@
 
                 </LinearLayout>
 
-                <!-- 批大小 -->
+                <!-- 批大小 (v4.0-MNN: MNN不使用batch参数，隐藏) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:visibility="gone">
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -474,11 +475,13 @@
 
                 </LinearLayout>
 
+                <!-- GPU 层数 (v4.0-MNN: MNN不使用GPU Layers参数，隐藏) -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:visibility="gone">
 
                     <LinearLayout
                         android:layout_width="match_parent"

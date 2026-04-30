@@ -158,6 +158,10 @@ class LlamaEngine @Inject constructor(
      * @param path 模型目录路径（包含config.json）
      * @param nCtx 上下文大小
      * @param nThreads 线程数
+     * @param nBatch [Deprecated] MNN不使用此参数
+     * @param flashAttn [Deprecated] MNN不使用此参数
+     * @param cacheType [Deprecated] MNN不使用此参数
+     * @param nGpuLayers [Deprecated] MNN不使用此参数
      */
     suspend fun loadModel(
         path: String, 
@@ -168,6 +172,9 @@ class LlamaEngine @Inject constructor(
         cacheType: String = "f16",
         nGpuLayers: Int = 0
     ): Boolean = withContext(Dispatchers.IO) {
+        // MNN不使用这些llama.cpp参数，仅记录日志
+        Log.w(TAG, "loadModel: nBatch=$nBatch, flashAttn=$flashAttn, cacheType=$cacheType, nGpuLayers=$nGpuLayers - [Deprecated] MNN不使用这些参数")
+        
         val configFile = File(path)
         
         // MNN模型是一个目录，需要找到config.json

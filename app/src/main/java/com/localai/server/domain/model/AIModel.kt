@@ -1,15 +1,21 @@
 package com.localai.server.domain.model
 
 /**
- * 优化参数配置
- * @param nBatch 批处理大小，默认 512
- * @param flashAttn 是否启用 Flash Attention，默认 true
- * @param cacheType KV cache 量化类型: f16/q4_0/q5_0/q8_0，默认 q4_0
+ * 优化参数配置 - MNN版本
+ * 
+ * 注意：MNN不使用 llama.cpp 的参数如 nBatch、flashAttn、cacheType、nGpuLayers
+ * 这些参数保留用于向后兼容，但实际引擎会忽略
+ * 
+ * @param backend MNN后端类型: arm82(CPU), vulkan(GPU), 默认 "arm82"
+ * @param nBatch 保留参数，MNN不使用
+ * @param flashAttn 保留参数，MNN不使用
+ * @param cacheType 保留参数，MNN不使用
  */
 data class OptimizationParams(
-    val nBatch: Int = 512,
-    val flashAttn: Boolean = true,
-    val cacheType: String = "q4_0"
+    val backend: String = "arm82",  // MNN后端: arm82(CPU), vulkan(GPU)
+    val nBatch: Int = 512,         // [Deprecated] MNN不使用
+    val flashAttn: Boolean = true,   // [Deprecated] MNN不使用
+    val cacheType: String = "f16"    // [Deprecated] MNN不使用
 )
 
 data class ModelConfig(
@@ -43,36 +49,18 @@ data class ModelInfo(
     val description: String
 )
 
-// ModelScope mirror for China - verified URLs
+// MNN预置模型列表
 val AVAILABLE_MODELS = listOf(
     ModelInfo(
-        name = "Qwen3-4B-Q3_K_M",
-        url = "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q3_K_M.gguf",
-        size = "~1.8GB",
-        description = "通用对话模型，更小体积，速度更快"
-    ),
-    ModelInfo(
-        name = "Qwen3-4B-Q4_K_M",
-        url = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+        name = "Qwen3.5-4B-Claude-Distilled",
+        url = "https://modelscope.cn/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
         size = "~2.5GB",
-        description = "通用对话模型，支持思考模式，性能更强"
+        description = "Claude蒸馏版，支持思考模式，MNN格式，推荐"
     ),
     ModelInfo(
-        name = "Qwen3-1.7B-Q4_K_M",
-        url = "https://modelscope.cn/api/v1/models/unsloth/Qwen3-1.7B-GGUF/resolve/master/Qwen3-1.7B-Q4_K_M.gguf",
-        size = "~1.1GB",
-        description = "轻量级模型，速度快，适合对话"
-    ),
-    ModelInfo(
-        name = "Qwen2.5-3B-Instruct-Q4_K_M",
-        url = "https://modelscope.cn/api/v1/models/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/master/qwen2.5-3b-instruct-q4_k_m.gguf",
-        size = "~1.9GB",
-        description = "中等规模，效果更好"
-    ),
-    ModelInfo(
-        name = "Qwen3-0.6B-Q4_K_M",
-        url = "https://modelscope.cn/api/v1/models/unsloth/Qwen3-0.6B-GGUF/resolve/master/Qwen3-0.6B-Q4_K_M.gguf",
-        size = "~400MB",
-        description = "超轻量级，极速响应"
+        name = "Qwen3-1.8B-Claude-Distilled",
+        url = "https://modelscope.cn/taobao-mnn/Qwen3-1.8B-Claude-Reasoning-Distilled-MNN",
+        size = "~1.2GB",
+        description = "轻量Claude蒸馏版，速度更快，MNN格式"
     )
 )

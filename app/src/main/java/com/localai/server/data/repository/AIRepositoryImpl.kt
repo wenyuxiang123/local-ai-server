@@ -178,12 +178,13 @@ class AIRepositoryImpl @Inject constructor(
             // 从 SharedPreferences 读取所有配置参数
             val prefs = context.getSharedPreferences("ai_config", Context.MODE_PRIVATE)
             val nThreads = prefs.getInt("n_threads", 4)
-            val nBatch = prefs.getInt("n_batch", 512)
+            val nBatch = prefs.getInt("n_batch", 512)  // [Deprecated] MNN不使用
             val nCtx = prefs.getInt("n_ctx", 2048)
-            val nGpuLayers = prefs.getInt("n_gpu_layers", 0)
+            val nGpuLayers = prefs.getInt("n_gpu_layers", 0)  // [Deprecated] MNN不使用
             
-            Log.i(TAG, "Loading model with config from SharedPreferences: nThreads=$nThreads, nCtx=$nCtx, nBatch=$nBatch, nGpuLayers=$nGpuLayers")
-            FileLog.log(TAG, "Loading model with config: nThreads=$nThreads, nCtx=$nCtx, nBatch=$nBatch, nGpuLayers=$nGpuLayers")
+            Log.i(TAG, "Loading MNN model with config: nThreads=$nThreads, nCtx=$nCtx")
+            Log.w(TAG, "loadModel: nBatch=$nBatch, nGpuLayers=$nGpuLayers - [Deprecated] MNN不使用这些参数")
+            FileLog.log(TAG, "Loading MNN model: nThreads=$nThreads, nCtx=$nCtx")
             
             val success = engine.loadModel(
                 path = path, 
@@ -199,15 +200,18 @@ class AIRepositoryImpl @Inject constructor(
                 // 更新 AIService 的模型加载状态
                 AIService.updateModelLoaded(true)
                 
+                // MNN不使用OptimizationParams中的llama.cpp参数
                 val config = ModelConfig(
-                    name = file.nameWithoutExtension,
+                    name = file.name,
                     path = path,
                     threads = nThreads,
-                    sizeBytes = file.length(),
+                    sizeBytes = if (file.isDirectory) {
+                        file.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
+                    } else {
+                        file.length()
+                    },
                     optimizationParams = com.localai.server.domain.model.OptimizationParams(
-                        nBatch = nBatch,
-                        flashAttn = true,
-                        cacheType = "f16"
+                        backend = "arm82"  // MNN后端
                     )
                 )
                 Result.success(config)

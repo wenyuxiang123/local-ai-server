@@ -19,8 +19,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 模型解压工具类
- * 支持从URL下载模型文件
+ * MNN模型提取器
+ * 支持从ModelScope/HuggingFace下载MNN模型到目录
  */
 @Singleton
 class ModelExtractor @Inject constructor(
@@ -31,20 +31,37 @@ class ModelExtractor @Inject constructor(
         private const val PREFS_NAME = "model_extractor"
         private const val KEY_MODEL_EXTRACTED = "model_extracted"
         private const val KEY_MODEL_VERSION = "model_version"
-        private const val CURRENT_MODEL_VERSION = "4B_Q3_v1"
-        private const val MODEL_FILE_NAME = "Qwen3-4B-Q3_K_M.gguf"
-        private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer
-        private const val EXPECTED_TOTAL_SIZE = 0L  // Q3_K_M 模型，下载后不校验精确大小
         
-private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q3_K_M.gguf"
-private val MODEL_DOWNLOAD_URLS = listOf(
-    // 1. ModelScope主源 - resolve格式（国内，速度快，支持302跳转到CDN）
-    "https://modelscope.cn/models/unsloth/Qwen3-4B-GGUF/resolve/master/Qwen3-4B-Q3_K_M.gguf",
-    // 2. ModelScope备选 - repo API格式
-    "https://modelscope.cn/api/v1/models/unsloth/Qwen3-4B-GGUF/repo?Revision=master&FilePath=Qwen3-4B-Q3_K_M.gguf",
-    // 3. HuggingFace备选源
-    "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q3_K_M.gguf"
-)
+        // MNN模型版本和配置
+        private const val CURRENT_MODEL_VERSION = "4B_Claude_MNN_v1"
+        private const val MODEL_FILE_NAME = "config.json"  // MNN模型目录以config.json为标识
+        private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer
+        
+        // MNN模型大小校验 - MNN模型是多文件，单文件不校验总大小
+        private const val EXPECTED_TOTAL_SIZE = 0L
+        
+        // MNN模型目录名
+        const val MNN_MODEL_DIR = "Qwen3.5-4B-Claude-Distilled"
+        
+        // MNN模型文件列表
+        private val MNN_MODEL_FILES = listOf(
+            "config.json",
+            "llm_config.json", 
+            "llm.mnn",
+            "llm.mnn.weight",
+            "tokenizer.txt"
+        )
+        
+        // 主下载URL - ModelScope
+        private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main"
+        
+        // 下载URL列表（按优先级）
+        private val MODEL_DOWNLOAD_URLS = listOf(
+            // 1. ModelScope主源
+            "https://modelscope.cn/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main",
+            // 2. HuggingFace镜像
+            "https://hf-mirror.com/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main"
+        )
     }
     
     private val prefs: SharedPreferences by lazy {
@@ -55,26 +72,38 @@ private val MODEL_DOWNLOAD_URLS = listOf(
         File(context.filesDir, "models").apply { mkdirs() }
     }
     
+    // MNN模型目录
+    private val modelDir: File by lazy {
+        File(modelsDir, MNN_MODEL_DIR).apply { mkdirs() }
+    }
+    
+    // config.json文件路径
     private val modelFile: File by lazy {
-        File(modelsDir, MODEL_FILE_NAME)
+        File(modelDir, MODEL_FILE_NAME)
     }
     
     /**
-     * 检查模型是否已解压
+     * 检查MNN模型是否已完整下载
      */
     fun isModelExtracted(): Boolean {
         val versionMatch = prefs.getString(KEY_MODEL_VERSION, "") == CURRENT_MODEL_VERSION
-        val fileExists = modelFile.exists()
-        val sizeMatch = if (EXPECTED_TOTAL_SIZE == 0L) fileExists else modelFile.length() == EXPECTED_TOTAL_SIZE
-        return versionMatch && fileExists && sizeMatch
+        val dirExists = modelDir.exists() && modelDir.isDirectory
+        val configExists = modelFile.exists()
+        
+        // 检查所有必需文件是否存在
+        val allFilesExist = MNN_MODEL_FILES.all { fileName ->
+            File(modelDir, fileName).exists()
+        }
+        
+        return versionMatch && dirExists && configExists && allFilesExist
     }
     
     /**
-     * 获取模型文件路径
+     * 获取MNN模型目录路径
      */
     fun getModelPath(): String? {
         return if (modelFile.exists()) {
-            modelFile.absolutePath
+            modelDir.absolutePath
         } else {
             null
         }
@@ -91,37 +120,37 @@ private val MODEL_DOWNLOAD_URLS = listOf(
     fun getDownloadUrl(): String = MODEL_DOWNLOAD_URL
     
     /**
-     * 解压/下载模型文件
-     * 从URL下载到 filesDir/models/
+     * 下载/解压MNN模型
+     * 从URL下载多文件到 modelsDir/MNN_MODEL_DIR/
      * 包含三个阶段：下载、等待加载、加载中
      * 支持多URL自动fallback
      */
     fun extractModel(): Flow<ExtractProgress> = flow {
-        // 检查模型文件是否已存在
+        // 检查模型是否已完整下载
         if (isModelExtracted()) {
-            Log.i(TAG, "Model already extracted: ${modelFile.absolutePath}")
+            Log.i(TAG, "MNN model already extracted: ${modelDir.absolutePath}")
             emit(ExtractProgress(100, "模型已就绪"))
             return@flow
         }
         
         // 确保目录存在
-        modelsDir.mkdirs()
+        modelDir.mkdirs()
         
         // 阶段1：下载（支持多URL fallback）
-        emit(ExtractProgress(0, "准备下载模型..."))
+        emit(ExtractProgress(0, "准备下载MNN模型..."))
         
         var lastException: Exception? = null
         var downloadedFromUrl: String? = null
         
-        for ((index, downloadUrl) in MODEL_DOWNLOAD_URLS.withIndex()) {
+        for ((index, baseUrl) in MODEL_DOWNLOAD_URLS.withIndex()) {
             val sourceName = if (index == 0) "ModelScope" else "HuggingFace"
-            Log.i(TAG, "Trying download from $sourceName: $downloadUrl")
-            com.localai.server.util.FileLog.log("ModelExtractor", "Trying download from $sourceName: $downloadUrl")
+            Log.i(TAG, "Trying download from $sourceName: $baseUrl")
+            com.localai.server.util.FileLog.log("ModelExtractor", "Trying download from $sourceName: $baseUrl")
             emit(ExtractProgress(1, "连接 $sourceName 服务器..."))
             
             try {
-                downloadModelWithFallback(downloadUrl)
-                downloadedFromUrl = downloadUrl
+                downloadMNNModelFiles(baseUrl)
+                downloadedFromUrl = baseUrl
                 Log.i(TAG, "Download successful from $sourceName")
                 break
             } catch (e: Exception) {
@@ -140,9 +169,9 @@ private val MODEL_DOWNLOAD_URLS = listOf(
             throw lastException ?: Exception("所有下载源均失败")
         }
         
-        // 阶段2：等待加载
+        // 阶段2：等待MNN初始化
         emit(ExtractProgress(98, "下载完成"))
-        emit(ExtractProgress(98, "正在初始化 llama.cpp..."))
+        emit(ExtractProgress(98, "正在初始化 MNN 引擎..."))
         Thread.sleep(500)
         emit(ExtractProgress(99, "加载模型权重..."))
         Thread.sleep(500)
@@ -159,14 +188,14 @@ private val MODEL_DOWNLOAD_URLS = listOf(
             .putString(KEY_MODEL_VERSION, CURRENT_MODEL_VERSION)
             .apply()
         
-        Log.i(TAG, "Model downloaded successfully: ${modelFile.absolutePath}")
-        emit(ExtractProgress(100, "模型准备完成"))
+        Log.i(TAG, "MNN model downloaded successfully: ${modelDir.absolutePath}")
+        emit(ExtractProgress(100, "MNN模型准备完成"))
         
     }.catch { e ->
-        Log.e(TAG, "Failed to download model", e)
+        Log.e(TAG, "Failed to download MNN model", e)
         // 清理可能的不完整文件和状态
-        if (modelFile.exists()) {
-            modelFile.delete()
+        if (modelDir.exists()) {
+            modelDir.deleteRecursively()
         }
         prefs.edit()
             .putBoolean(KEY_MODEL_EXTRACTED, false)
@@ -176,23 +205,36 @@ private val MODEL_DOWNLOAD_URLS = listOf(
     }.flowOn(Dispatchers.IO)
     
     /**
-     * 从单个URL下载模型文件
+     * 下载MNN模型的所有文件
      */
-    private suspend fun FlowCollector<ExtractProgress>.downloadModelWithFallback(urlString: String) {
-        downloadModel(urlString)
+    private suspend fun FlowCollector<ExtractProgress>.downloadMNNModelFiles(baseUrl: String) {
+        val totalFiles = MNN_MODEL_FILES.size
+        var downloadedFiles = 0
+        
+        for (fileName in MNN_MODEL_FILES) {
+            val fileUrl = "$baseUrl/$fileName"
+            Log.i(TAG, "Downloading $fileName...")
+            emit(ExtractProgress(
+                (downloadedFiles * 95 / totalFiles).coerceAtLeast(2),
+                "下载 $fileName..."
+            ))
+            
+            downloadMNNFile(fileUrl, File(modelDir, fileName))
+            downloadedFiles++
+        }
     }
     
     /**
-     * 从URL下载模型文件
+     * 从URL下载单个MNN模型文件
      */
-    private suspend fun FlowCollector<ExtractProgress>.downloadModel(urlString: String) {
+    private suspend fun FlowCollector<ExtractProgress>.downloadMNNFile(urlString: String, targetFile: File) {
         var connection: HttpURLConnection? = null
         var downloaded = 0L
         var startTime = System.currentTimeMillis()
         var lastUpdateTime = startTime
         
         try {
-            // 手动处理重定向，支持ModelScope的302跳转
+            // 手动处理重定向
             var currentUrl = urlString
             var redirectCount = 0
             val maxRedirects = 5
@@ -203,7 +245,7 @@ private val MODEL_DOWNLOAD_URLS = listOf(
                 connection.connectTimeout = 30000
                 connection.readTimeout = 300000 // 5分钟超时
                 connection.requestMethod = "GET"
-                connection.instanceFollowRedirects = false // 手动处理重定向
+                connection.instanceFollowRedirects = false
                 connection.connect()
                 
                 val responseCode = connection.responseCode
@@ -234,14 +276,11 @@ private val MODEL_DOWNLOAD_URLS = listOf(
             
             val finalConnection = connection ?: throw Exception("连接失败")
             val contentLength = finalConnection.contentLength.toLong()
-            // 如果服务器不返回Content-Length，使用预期大小
             val totalSize = if (contentLength > 0) contentLength else EXPECTED_TOTAL_SIZE
-            Log.i(TAG, "Content-Length: $contentLength, using totalSize: $totalSize")
-            
-            emit(ExtractProgress(2, "开始下载模型 (0%)"))
+            Log.i(TAG, "Content-Length: $contentLength, file: ${targetFile.name}")
             
             finalConnection.inputStream.use { input ->
-                FileOutputStream(modelFile).use { output ->
+                FileOutputStream(targetFile).use { output ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var read: Int
                     
@@ -249,14 +288,6 @@ private val MODEL_DOWNLOAD_URLS = listOf(
                         output.write(buffer, 0, read)
                         downloaded += read
                         
-                        // 计算进度 (2% - 95%)
-                        val progress = if (totalSize > 0) {
-                            (2 + (downloaded * 93 / totalSize)).toInt()
-                        } else {
-                            ((downloaded % 100) + 2).toInt().coerceIn(2, 95)
-                        }
-                        
-                        // 每秒更新一次
                         val currentTime = System.currentTimeMillis()
                         if (currentTime - lastUpdateTime >= 1000) {
                             lastUpdateTime = currentTime
@@ -268,83 +299,41 @@ private val MODEL_DOWNLOAD_URLS = listOf(
                             }
                             
                             val downloadedMB = downloaded / (1024 * 1024)
-                            val totalMB = totalSize / (1024 * 1024)
+                            val totalMB = if (totalSize > 0) totalSize / (1024 * 1024) else 0
                             
-                            // 计算下载速度
-                            val elapsedSeconds = (currentTime - startTime) / 1000.0
-                            val speedMBps = if (elapsedSeconds > 0) {
-                                String.format("%.1f", downloaded / (1024 * 1024) / elapsedSeconds)
-                            } else {
-                                "--"
-                            }
+                            val speedMBps = String.format("%.1f", downloaded / (1024 * 1024) / ((currentTime - startTime) / 1000.0).coerceAtLeast(1.0))
                             
-                            // 计算剩余时间
-                            val remainingStr = if (totalSize > 0 && downloaded > 0) {
-                                val remainingBytes = totalSize - downloaded
-                                val remainingSeconds = (remainingBytes / (downloaded / elapsedSeconds)).toInt()
-                                val minutes = remainingSeconds / 60
-                                val seconds = remainingSeconds % 60
-                                "${minutes}分${seconds}秒"
-                            } else {
-                                "--"
-                            }
-                            
-                            val speedBytesPerSec = if (elapsedSeconds > 0) {
-                                (downloaded / elapsedSeconds).toLong()
+                            val speedBytesPerSec = if (currentTime - startTime > 0) {
+                                (downloaded * 1000 / (currentTime - startTime)).toLong()
                             } else {
                                 0L
                             }
                             
                             emit(ExtractProgress(
-                                percent = progress.coerceIn(2, 95),
-                                message = "下载中 $percent% | $downloadedMB/$totalMB MB | $speedMBps MB/s | 剩余 $remainingStr",
-                                downloadedBytes = downloaded,
-                                totalBytes = totalSize,
-                                speedBytesPerSec = speedBytesPerSec
+                                percent = percent.coerceIn(2, 95),
+                                message = "下载 ${targetFile.name} $percent% | $downloadedMB/${if (totalMB > 0) totalMB else "--"} MB | $speedMBps MB/s"
                             ))
                         }
                     }
                 }
             }
             
-            // 验证文件大小
-            if (totalSize > 0 && modelFile.length() != totalSize) {
-                Log.w(TAG, "File size mismatch: ${modelFile.length()} vs expected $totalSize")
-            }
-            
-            emit(ExtractProgress(97, "下载完成，验证文件中..."))
+            Log.i(TAG, "Downloaded ${targetFile.name}: ${targetFile.length()} bytes")
             
         } catch (e: Exception) {
-            modelFile.delete()
+            Log.e(TAG, "Failed to download ${targetFile.name}", e)
+            targetFile.delete()
             throw e
         } finally {
             connection?.disconnect()
         }
     }
-    
-    /**
-     * 重置解压状态
-     */
-    fun resetExtraction() {
-        prefs.edit()
-            .putBoolean(KEY_MODEL_EXTRACTED, false)
-            .putString(KEY_MODEL_VERSION, "")
-            .apply()
-        
-        if (modelFile.exists()) {
-            modelFile.delete()
-        }
-    }
 }
 
 /**
- * 提取进度数据类
+ * 下载进度数据类
  */
 data class ExtractProgress(
     val percent: Int,
-    val message: String,
-    val downloadedBytes: Long = 0,
-    val totalBytes: Long = 0,
-    val speedBytesPerSec: Long = 0
+    val message: String
 )
-
