@@ -16,7 +16,7 @@
 // MNN LLM 头文件
 #include "MNN/MNNDefine.h"
 #include "MNN/Tensor.hpp"
-#include "MNN/Transformer/llm.hpp"
+#include "llm/llm.hpp"
 
 #define TAG "MnnEngine"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
@@ -116,7 +116,7 @@ Java_com_localai_server_engine_LlamaEngine_initNativeCallback(
  * @param nThreads 线程数
  */
 JNIEXPORT jboolean JNICALL
-Java_com_localai_server_engine_LlamaEngine_loadModelNative(
+Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         JNIEnv* env, jobject thiz,
         jstring config_path, jint n_ctx, jint n_threads) {
     
@@ -181,7 +181,7 @@ Java_com_localai_server_engine_LlamaEngine_loadModelNative(
  * 卸载模型
  */
 JNIEXPORT void JNICALL
-Java_com_localai_server_engine_LlamaEngine_unloadModelNative(
+Java_com_localai_server_engine_LlamaEngine_nativeUnloadModel(
         JNIEnv* env, jobject thiz) {
     
     LOGI("Unloading MNN model");
@@ -200,7 +200,7 @@ Java_com_localai_server_engine_LlamaEngine_unloadModelNative(
  * 检查模型是否已加载
  */
 JNIEXPORT jboolean JNICALL
-Java_com_localai_server_engine_LlamaEngine_isModelLoadedNative(
+Java_com_localai_server_engine_LlamaEngine_nativeIsModelLoaded(
         JNIEnv* env, jobject thiz) {
     return (g_llm != nullptr && g_is_loaded) ? JNI_TRUE : JNI_FALSE;
 }
@@ -209,7 +209,7 @@ Java_com_localai_server_engine_LlamaEngine_isModelLoadedNative(
  * 生成文本（非流式）
  */
 JNIEXPORT jstring JNICALL
-Java_com_localai_server_engine_LlamaEngine_generateNative(
+Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
         JNIEnv* env, jobject thiz,
         jstring prompt, jint max_tokens, jfloat temperature, jint top_k, jfloat top_p) {
     
@@ -260,7 +260,7 @@ Java_com_localai_server_engine_LlamaEngine_generateNative(
  * 流式生成（每个token回调Kotlin）
  */
 JNIEXPORT jstring JNICALL
-Java_com_localai_server_engine_LlamaEngine_generateStreamNative(
+Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
         JNIEnv* env, jobject thiz,
         jstring prompt, jint max_tokens, jfloat temperature, jint top_k, jfloat top_p) {
     
@@ -322,7 +322,7 @@ Java_com_localai_server_engine_LlamaEngine_generateStreamNative(
  * 获取已加载模型名称
  */
 JNIEXPORT jstring JNICALL
-Java_com_localai_server_engine_LlamaEngine_getLoadedModelNameNative(
+Java_com_localai_server_engine_LlamaEngine_nativeGetLoadedModelName(
         JNIEnv* env, jobject thiz) {
     return env->NewStringUTF(g_model_name.c_str());
 }
@@ -331,7 +331,7 @@ Java_com_localai_server_engine_LlamaEngine_getLoadedModelNameNative(
  * 获取上下文大小
  */
 JNIEXPORT jint JNICALL
-Java_com_localai_server_engine_LlamaEngine_getContextSizeNative(
+Java_com_localai_server_engine_LlamaEngine_nativeGetContextSize(
         JNIEnv* env, jobject thiz) {
     if (g_llm == nullptr) return 0;
     // 从配置获取上下文大小，默认返回4096
@@ -342,7 +342,7 @@ Java_com_localai_server_engine_LlamaEngine_getContextSizeNative(
  * 获取内存使用（估算）
  */
 JNIEXPORT jlong JNICALL
-Java_com_localai_server_engine_LlamaEngine_getMemoryUsageNative(
+Java_com_localai_server_engine_LlamaEngine_nativeGetMemoryUsage(
         JNIEnv* env, jobject thiz) {
     if (g_llm == nullptr) return 0;
     // MNN模型大小估算
@@ -354,7 +354,7 @@ Java_com_localai_server_engine_LlamaEngine_getMemoryUsageNative(
  * 设置系统提示词
  */
 JNIEXPORT jboolean JNICALL
-Java_com_localai_server_engine_LlamaEngine_setSystemPromptNative(
+Java_com_localai_server_engine_LlamaEngine_nativeSetSystemPrompt(
         JNIEnv* env, jobject thiz, jstring system_prompt) {
     
     if (g_llm == nullptr) {
@@ -380,7 +380,7 @@ Java_com_localai_server_engine_LlamaEngine_setSystemPromptNative(
  * 重置对话历史
  */
 JNIEXPORT void JNICALL
-Java_com_localai_server_engine_LlamaEngine_resetConversationNative(
+Java_com_localai_server_engine_LlamaEngine_nativeResetConversation(
         JNIEnv* env, jobject thiz) {
     
     if (g_llm != nullptr) {

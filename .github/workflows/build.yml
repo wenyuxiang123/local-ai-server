@@ -8,13 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - abi: arm64-v8a
-            needs_vulkan: true
-          - abi: x86_64
-            needs_vulkan: false
     
     steps:
     - uses: actions/checkout@v4
@@ -29,7 +22,6 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
     
     - name: Install Vulkan SDK
-      if: matrix.needs_vulkan == true
       run: |
         sudo apt-get update
         sudo apt-get install -y libvulkan-dev vulkan-tools
@@ -72,11 +64,10 @@ jobs:
           -DMNN_BUILD_SHARED_LIBS=ON \
           -DCMAKE_BUILD_TYPE=Release
         
-        # 编译MNN和LLM库
-        make -j$(nproc) MNN MNN_Express llm
+        # 编译所有target
+        make -j$(nproc)
         
         echo "=== Build Output ==="
-        ls -la *.so 2>/dev/null || echo "No .so files in current dir"
         find .. -name "*.so" -type f | head -20
     
     - name: Prepare jniLibs
@@ -87,23 +78,14 @@ jobs:
         # 复制MNN库文件
         cd ${GITHUB_WORKSPACE}/mnn-src/build_android
         
-        if [ -f libMNN.so ]; then
-          cp libMNN.so ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
-          echo "Copied libMNN.so"
-        else
-          echo "WARNING: libMNN.so not found"
-          find .. -name "libMNN.so" -type f
-        fi
-        
-        if [ -f libMNN_Express.so ]; then
-          cp libMNN_Express.so ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
-          echo "Copied libMNN_Express.so"
-        fi
-        
-        if [ -f libllm.so ]; then
-          cp libllm.so ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
-          echo "Copied libllm.so"
-        fi
+        # 查找所有生成的.so文件并复制
+        for so_file in $(find .. -name "*.so" -type f); do
+          filename=$(basename $so_file)
+          if [[ "$filename" == "libMNN"* || "$filename" == "libllm"* ]]; then
+            cp $so_file ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
+            echo "Copied $filename"
+          fi
+        done
         
         echo "=== jniLibs contents ==="
         ls -la ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
@@ -133,11 +115,11 @@ jobs:
       run: ./gradlew assembleRelease --no-daemon
       env:
         MNN_SRC: ${{ github.workspace }}/mnn-src
-        ANDROID_ABI: ${{ matrix.abi }}
+        ANDROID_ABI: arm64-v8a
         ANDROID_NDK: /opt/android-ndk-r26d
     
     - name: Upload unsigned APK
       uses: actions/upload-artifact@v4
       with:
-        name: LocalAI-Server-v4.0-MNN-unsigned-${{ matrix.abi }}
+        name: LocalAI-Server-v4.0-MNN-unsigned-arm64
         path: app/build/outputs/apk/release/app-release-unsigned.apk

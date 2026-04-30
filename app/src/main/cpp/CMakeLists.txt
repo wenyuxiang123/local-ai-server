@@ -32,6 +32,7 @@ add_library(localai-jni SHARED
 
 target_include_directories(localai-jni PRIVATE
     ${MNN_INCLUDE_DIR}
+    ${MNN_INCLUDE_DIR}/llm
 )
 
 target_link_libraries(localai-jni
