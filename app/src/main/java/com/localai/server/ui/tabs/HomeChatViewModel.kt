@@ -11,6 +11,7 @@ import com.localai.server.data.repository.ChatMessage
 import com.localai.server.data.repository.ChatRepository
 import com.localai.server.domain.repository.AIRepository
 import com.localai.server.network.WebSearchService
+import com.localai.server.network.WebViewSearchService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
@@ -38,6 +39,7 @@ class HomeChatViewModel @Inject constructor(
     private val chatApiService: ChatApiService,
     private val aiRepository: AIRepository,
     private val webSearchService: WebSearchService,
+    private val webViewSearchService: WebViewSearchService,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -327,30 +329,29 @@ class HomeChatViewModel @Inject constructor(
                     _uiState.update { it.copy(searchStatus = "正在搜索...") }
                     com.localai.server.util.FileLog.log("HomeChatVM", "联网搜索已启用，开始搜索: " + content)
 
-                    val searchResponse = webSearchService.search(content)
-
-                    if (searchResponse.error != null) {
-                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索失败: " + searchResponse.error)
-                        _effect.emit(HomeChatEffect.ShowError("搜索未返回结果，将使用本地知识回答"))
-                        // 搜索失败时fallback到普通发送
-                        sendNormalMessage(conversationId, content)
-                        return@launch
-                    } else {
-                        val searchResults = searchResponse.results.take(5)
-                        // 使用 WebSearchService 的 buildSearchContext 方法确保长度限制在 800 字以内
-                        val searchContext = webSearchService.buildSearchContext(searchResults)
-                        val statusMsg = if (searchResults.isNotEmpty()) {
-                            "找到 " + searchResults.size + " 条结果"
-                        } else {
-                            "未找到相关结果"
-                        }
-                        _uiState.update { it.copy(searchStatus = statusMsg) }
-                        com.localai.server.util.FileLog.log("HomeChatVM", "搜索完成: " + statusMsg + ", 上下文长度=" + searchContext.length)
-
-                        // 使用搜索上下文发送消息
-                        sendMessageWithContext(conversationId, content, searchContext, searchResults.map { it.url })
-                        return@launch
+                    // 优先使用WebView搜索（绕过反爬）
+                    var searchResponse = webViewSearchService.search(content)
+                    
+                    // WebView搜索无结果时降级到OkHttp
+                    if (searchResponse.results.isEmpty()) {
+                        com.localai.server.util.FileLog.log("HomeChatVM", "WebView搜索无结果，降级到OkHttp搜索")
+                        searchResponse = webSearchService.search(content)
                     }
+                    
+                    val searchResults = searchResponse.results.take(5)
+                    // 使用 WebViewSearchService 的 buildSearchContext 方法确保长度限制在 800 字以内
+                    val searchContext = webViewSearchService.buildSearchContext(searchResults)
+                    val statusMsg = if (searchResults.isNotEmpty()) {
+                        "找到 " + searchResults.size + " 条结果"
+                    } else {
+                        "未找到相关结果"
+                    }
+                    _uiState.update { it.copy(searchStatus = statusMsg) }
+                    com.localai.server.util.FileLog.log("HomeChatVM", "搜索完成: " + statusMsg + ", 上下文长度=" + searchContext.length)
+
+                    // 使用搜索上下文发送消息
+                    sendMessageWithContext(conversationId, content, searchContext, searchResults.map { it.url })
+                    return@launch
                 }
 
                 // 正常发送消息（不启用联网搜索）
