@@ -29,6 +29,7 @@ import com.localai.server.ui.main.LoadingPhase
 import com.localai.server.ui.main.MainViewModel
 import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.launch
 
 /**
