@@ -114,9 +114,6 @@ class MainViewModel @Inject constructor(
                     startService()
                 } else {
                     // 下载完成但模型加载失败（可能是MNN引擎问题）
-                    val missingInfo = if (::modelExtractor.isInitialized) {
-                        "（部分文件可能缺失，请检查日志）"
-                    } else ""
                     _state.update { it.copy(
                         loadingPhase = LoadingPhase.IDLE,
                         error = "模型文件下载完成但MNN引擎加载失败"
