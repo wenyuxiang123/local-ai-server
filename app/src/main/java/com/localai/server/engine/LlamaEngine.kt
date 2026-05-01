@@ -221,7 +221,7 @@ class LlamaEngine @Inject constructor(
             // 验证模型文件完整性
             val modelDir = if (file.isDirectory) file else file.parentFile
             if (modelDir != null && modelDir.isDirectory) {
-                val requiredFiles = listOf("config.json", "llm_config.json", "llm.mnn", "llm.mnn.weight", "llm.mnn.json", "tokenizer.txt")
+                val requiredFiles = listOf("config.json", "llm_config.json", "llm.mnn", "llm.mnn.weight", "llm.mnn.json", "tokenizer.txt", "visual.mnn", "visual.mnn.weight")
                 val knownSizes = mapOf(
                     // 文件大小来源：ModelScope API v1/models/MNN/Qwen3.5-4B-MNN/repo/files
                     "config.json" to 652L,                    // 实际大小: 652
@@ -229,7 +229,9 @@ class LlamaEngine @Inject constructor(
                     "llm.mnn" to 3651096L,                    // 实际大小: 3651096
                     "llm.mnn.weight" to 2629387626L,          // 实际大小: 2629387626
                     "llm.mnn.json" to 9172204L,                // 实际大小: 9172204
-                    "tokenizer.txt" to 6465727L               // 实际大小: 6465727
+                    "tokenizer.txt" to 6465727L,               // 实际大小: 6465727
+                    "visual.mnn" to 488096L,                    // 实际大小: 488096
+                    "visual.mnn.weight" to 196768960L           // 实际大小: 196768960
                 )
                 FileLog.log(TAG, "=== Model file verification ===")
                 for (fname in requiredFiles) {

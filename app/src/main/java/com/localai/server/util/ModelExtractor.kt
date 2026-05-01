@@ -57,11 +57,13 @@ class ModelExtractor @Inject constructor(
             "llm.mnn" to 3651096L,                      // 实际大小: 3651096
             "llm.mnn.weight" to 2629387626L,            // 实际大小: 2629387626
             "llm.mnn.json" to 9172204L,                // 实际大小: 9172204
-            "tokenizer.txt" to 6465727L                // 实际大小: 6465727
+            "tokenizer.txt" to 6465727L,                // 实际大小: 6465727
+            "visual.mnn" to 488096L,                    // 实际大小: 488096 (视觉编码器模型)
+            "visual.mnn.weight" to 196768960L           // 实际大小: 196768960 (~188MB 视觉编码器权重)
         )
         
         // 模型总大小（所有文件之和）
-        private const val TOTAL_MODEL_SIZE = 2648685998L  // ~2.65GB (所有文件实际大小之和)
+        private const val TOTAL_MODEL_SIZE = 2845943794L  // ~2.84GB (所有文件实际大小之和，含视觉模块)
         
         // MNN模型目录名
         const val MNN_MODEL_DIR = "Qwen3.5-4B-MNN"
@@ -73,7 +75,9 @@ class ModelExtractor @Inject constructor(
             "llm.mnn",
             "llm.mnn.weight",
             "llm.mnn.json",
-            "tokenizer.txt"
+            "tokenizer.txt",
+            "visual.mnn",
+            "visual.mnn.weight"
         )
         
         // 主下载URL - ModelScope (使用API格式)
