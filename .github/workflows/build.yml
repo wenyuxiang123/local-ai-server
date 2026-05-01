@@ -59,6 +59,10 @@ jobs:
           -DMNN_LOW_MEMORY=true \
           -DMNN_CPU_WEIGHT_DEQUANT_GEMM=true \
           -DMNN_BUILD_LLM=true \
+          -DMNN_BUILD_LLM_OMNI=ON \
+          -DLLM_SUPPORT_VISION=true \
+          -DMNN_BUILD_OPENCV=true \
+          -DMNN_IMGCODECS=true \
           -DMNN_SUPPORT_TRANSFORMER_FUSE=true \
           -DMNN_USE_SSE=OFF \
           -DMNN_BUILD_SHARED_LIBS=ON \
@@ -81,7 +85,7 @@ jobs:
         # 查找所有生成的.so文件并复制
         for so_file in $(find .. -name "*.so" -type f); do
           filename=$(basename $so_file)
-          if [[ "$filename" == "libMNN"* || "$filename" == "libllm"* ]]; then
+          if [[ "$filename" == "libMNN"* || "$filename" == "libllm"* || "$filename" == "libc++_shared.so" ]]; then
             cp $so_file ${GITHUB_WORKSPACE}/app/src/main/jniLibs/arm64-v8a/
             echo "Copied $filename"
           fi

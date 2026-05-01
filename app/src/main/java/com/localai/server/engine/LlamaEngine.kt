@@ -56,6 +56,7 @@ class LlamaEngine @Inject constructor(
                 System.loadLibrary("llm")
                 System.loadLibrary("MNN_Express")
                 System.loadLibrary("MNN")
+                try { System.loadLibrary("MNNOpenCV") } catch (_: UnsatisfiedLinkError) { }
                 Log.i(TAG, "MNN native libraries loaded")
                 true
             } catch (e: Exception) {
@@ -132,6 +133,7 @@ class LlamaEngine @Inject constructor(
             System.loadLibrary("llm")
             System.loadLibrary("MNN_Express")
             System.loadLibrary("MNN")
+            try { System.loadLibrary("MNNOpenCV") } catch (_: UnsatisfiedLinkError) { }
             nativeInitNative()
             _state.value = State.Initialized
             Log.i(TAG, "MNN native libraries loaded successfully")
