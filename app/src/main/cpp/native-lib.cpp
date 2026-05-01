@@ -17,6 +17,7 @@
 #include <android/log.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <chrono>
 
 // MNN LLM 头文件
 #include "MNN/MNNDefine.h"
@@ -160,12 +161,13 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
     try {
         // ========== 步骤1: 创建LLM实例 ==========
         LOGI("[STEP 1/3] Creating LLM instance (createLLM)...");
-        long long create_start = android::tickUptimeMs();
+        auto create_start = std::chrono::steady_clock::now();
         
         g_llm = MNN::Transformer::Llm::createLLM(config_path_str);
         
-        long long create_end = android::tickUptimeMs();
-        LOGI("[STEP 1/3] createLLM completed in %lld ms", (create_end - create_start));
+        auto create_end = std::chrono::steady_clock::now();
+        long long create_ms = std::chrono::duration_cast<std::chrono::milliseconds>(create_end - create_start).count();
+        LOGI("[STEP 1/3] createLLM completed in %lld ms", create_ms);
         
         if (g_llm == nullptr) {
             LOGE("[STEP 1/3] FAILED: createLLM returned nullptr");
@@ -192,12 +194,12 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         std::string config_str = config_json.str();
         LOGI("[STEP 2/3] Config JSON: %s", config_str.c_str());
         
-        long long setconfig_start = android::tickUptimeMs();
+        long long setconfig_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         bool config_success = g_llm->set_config(config_str);
-        long long setconfig_end = android::tickUptimeMs();
+        long long setconfig_end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         
         LOGI("[STEP 2/3] set_config completed in %lld ms, result: %s", 
-             (setconfig_end - setconfig_start), config_success ? "SUCCESS" : "FAILED");
+             (setconfig_end_ms - setconfig_start_ms), config_success ? "SUCCESS" : "FAILED");
         
         if (!config_success) {
             LOGE("[STEP 2/3] FAILED: set_config returned false");
@@ -212,12 +214,12 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         LOGI("[STEP 3/3] Loading model (load)...");
         LOGI("[STEP 3/3] This may take several minutes for large models...");
         
-        long long load_start = android::tickUptimeMs();
+        long long load_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         bool load_success = g_llm->load();
-        long long load_end = android::tickUptimeMs();
+        long long load_end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         
         LOGI("[STEP 3/3] load() completed in %lld ms (%lld seconds)", 
-             (load_end - load_start), (load_end - load_start) / 1000);
+             (load_end_ms - load_start_ms), (load_end_ms - load_start_ms) / 1000);
         
         if (!load_success) {
             LOGE("[STEP 3/3] FAILED: load() returned false");
@@ -242,7 +244,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         g_is_loaded = true;
         
         // 计算总耗时
-        long long total_time = load_end - create_start;
+        long long total_time = load_end_ms - create_ms;
         LOGI("=== MNN model loaded successfully in %lld ms (%lld seconds) ===", 
              total_time, total_time / 1000);
         LOGI("Model name: %s", g_model_name.c_str());
@@ -252,7 +254,6 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
     } catch (const std::exception& e) {
         LOGE("=== EXCEPTION during model loading ===");
-        LOGE("Exception type: %s", typeid(e).name());
         LOGE("Exception message: %s", e.what());
         LOGE("This likely indicates:");
         LOGE("  - Corrupted model files");
