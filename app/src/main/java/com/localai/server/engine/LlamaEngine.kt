@@ -267,6 +267,21 @@ class LlamaEngine @Inject constructor(
                 FileLog.log(TAG, "=== MODEL LOAD FAILED ===")
                 FileLog.log(TAG, "  Native error: $nativeError")
                 FileLog.log(TAG, "  Path: $actualPath")
+                
+                // 读取最近50行的MNN相关logcat日志
+                try {
+                    val logcatProcess = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "100", "-s", "MnnEngine", "MNN", "MNNJNI"))
+                    val logOutput = logcatProcess.inputStream.bufferedReader().readText()
+                    if (logOutput.isNotBlank()) {
+                        FileLog.log(TAG, "=== Recent MNN Logcat (last 100 lines) ===")
+                        logOutput.lines().takeLast(50).forEach { line ->
+                            FileLog.log(TAG, line)
+                        }
+                    }
+                } catch (e: Exception) {
+                    FileLog.log(TAG, "Failed to read logcat: ${e.message}")
+                }
+                
                 _state.value = State.Error(errMsg)
                 false
             }
