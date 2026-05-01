@@ -102,7 +102,7 @@ class LlamaEngine @Inject constructor(
     
     // ==================== JNI方法声明 ====================
     
-    private external fun initNative()
+    private external fun nativeInitNative()
     private external fun nativeLoadModel(configPath: String, nCtx: Int, nThreads: Int): Boolean
     private external fun nativeUnloadModel()
     private external fun nativeIsModelLoaded(): Boolean
@@ -131,6 +131,7 @@ class LlamaEngine @Inject constructor(
             System.loadLibrary("llm")
             System.loadLibrary("MNN_Express")
             System.loadLibrary("MNN")
+            nativeInitNative()
             _state.value = State.Initialized
             Log.i(TAG, "MNN native libraries loaded successfully")
         } catch (e: UnsatisfiedLinkError) {

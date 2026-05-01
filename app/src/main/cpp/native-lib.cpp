@@ -83,9 +83,9 @@ extern "C" {
  * 当前MNN不需要额外初始化，只需确认库加载成功
  */
 JNIEXPORT void JNICALL
-Java_com_localai_server_engine_LlamaEngine_initNative(
+Java_com_localai_server_engine_LlamaEngine_nativeInitNative(
         JNIEnv* env, jobject thiz) {
-    LOGI("MNN JNI initNative called - libraries loaded successfully");
+    LOGI("MNN JNI nativeInitNative called - libraries loaded successfully");
 }
 
 /**

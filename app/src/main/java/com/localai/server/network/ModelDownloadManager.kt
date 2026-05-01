@@ -228,8 +228,7 @@ class ModelDownloadManager @Inject constructor(
                 val tempFile = File(modelTempDir, "${file.fileName}.tmp")
                 
                 _downloadState.value = _downloadState.value.copy(
-                    currentFile = file.fileName,
-                    currentFileIndex = index
+                    currentFile = file.fileName
                 )
                 
                 Log.i(TAG, "Downloading ${file.fileName} (${index + 1}/${config.files.size})")
@@ -264,7 +263,7 @@ class ModelDownloadManager @Inject constructor(
                 status = STATUS_COMPLETED,
                 modelName = modelName,
                 downloadedBytes = config.totalSize,
-                totalBytes = config.totalBytes
+                totalBytes = config.totalSize
             )
             
             Log.i(TAG, "Model downloaded successfully: $modelName")
