@@ -50,14 +50,14 @@ class ModelExtractor @Inject constructor(
         private const val EXPECTED_TOTAL_SIZE = 0L
         
         // MNN模型各文件的已知大小（字节），用于在Content-Length不可用时作为fallback
-        // 文件大小来源：ModelScope API v1/models/MNN/Qwen3.5-4B-MNN/repo/files
+        // 文件大小来源：ModelScope API v1/models/MNN/Qwen3-4B-Instruct-2507-MNN/repo/files
         val KNOWN_FILE_SIZES = mapOf(
-            "config.json" to 652L,                    // 实际大小: 652
-            "llm_config.json" to 8693L,                // 实际大小: 8693
-            "llm.mnn" to 3651096L,                    // 实际大小: 3651096
-            "llm.mnn.weight" to 2629387626L,          // 实际大小: 2629387626
-            "llm.mnn.json" to 9172204L,                // 实际大小: 9172204
-            "tokenizer.txt" to 6465727L               // 实际大小: 6465727
+            "config.json" to 403L,                    // 实际大小: 403
+            "llm_config.json" to 4803L,                // 实际大小: 4803
+            "llm.mnn" to 592336L,                      // 实际大小: 592336
+            "llm.mnn.weight" to 2709972658L,            // 实际大小: 2709972658
+            "llm.mnn.json" to 1243600L,                // 实际大小: 1243600
+            "tokenizer.txt" to 3193555L                // 实际大小: 3193555
         )
         
         // 模型总大小（所有文件之和）

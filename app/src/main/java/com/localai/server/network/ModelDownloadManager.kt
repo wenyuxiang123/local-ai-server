@@ -55,26 +55,26 @@ class ModelDownloadManager @Inject constructor(
             val totalSize: Long
         )
         
-        // 默认MNN模型 - Qwen3.5-4B-MNN (MNN官方格式，修复magic bytes兼容问题)
+        // 默认MNN模型 - Qwen3-4B-Instruct-2507-MNN (标准MNN格式，兼容MNN 3.4.1)
         // 下载源：ModelScope
         private val MNN_MODELS = mapOf(
-            "Qwen3.5-4B-MNN" to MnnModelConfig(
-                name = "Qwen3.5-4B-MNN",
-                description = "MNN官方Qwen3.5-4B - MNN标准格式，支持思考模式，修复magic bytes兼容问题",
-                totalSize = 2_648_686_898L, // ~2.65GB
+            "Qwen3-4B-Instruct-2507-MNN" to MnnModelConfig(
+                name = "Qwen3-4B-Instruct-2507-MNN",
+                description = "MNN/Qwen3-4B-Instruct-2507-MNN - 标准MNN格式，兼容MNN 3.4.1",
+                totalSize = 2_715_245_355L, // ~2.71GB
                 files = listOf(
-                    MnnModelFile("config.json", 652, 
-                        "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath=config.json"),
-                    MnnModelFile("llm_config.json", 8693,
-                        "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath=llm_config.json"),
-                    MnnModelFile("llm.mnn", 3651096, 
-                        "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath=llm.mnn"),
-                    MnnModelFile("llm.mnn.weight", 2629387626,
-                        "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath=llm.mnn.weight"),
-                    MnnModelFile("llm.mnn.json", 9172204,
-                        "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath=llm.mnn.json"),
-                    MnnModelFile("tokenizer.txt", 6465727,
-                        "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath=tokenizer.txt")
+                    MnnModelFile("config.json", 403, 
+                        "https://modelscope.cn/api/v1/models/MNN/Qwen3-4B-Instruct-2507-MNN/repo?Revision=master&FilePath=config.json"),
+                    MnnModelFile("llm_config.json", 4803,
+                        "https://modelscope.cn/api/v1/models/MNN/Qwen3-4B-Instruct-2507-MNN/repo?Revision=master&FilePath=llm_config.json"),
+                    MnnModelFile("llm.mnn", 592336, 
+                        "https://modelscope.cn/api/v1/models/MNN/Qwen3-4B-Instruct-2507-MNN/repo?Revision=master&FilePath=llm.mnn"),
+                    MnnModelFile("llm.mnn.weight", 2709972658,
+                        "https://modelscope.cn/api/v1/models/MNN/Qwen3-4B-Instruct-2507-MNN/repo?Revision=master&FilePath=llm.mnn.weight"),
+                    MnnModelFile("llm.mnn.json", 1243600,
+                        "https://modelscope.cn/api/v1/models/MNN/Qwen3-4B-Instruct-2507-MNN/repo?Revision=master&FilePath=llm.mnn.json"),
+                    MnnModelFile("tokenizer.txt", 3193555,
+                        "https://modelscope.cn/api/v1/models/MNN/Qwen3-4B-Instruct-2507-MNN/repo?Revision=master&FilePath=tokenizer.txt")
                 )
             ),
             // 备用：较小的Qwen3-1.8B蒸馏版

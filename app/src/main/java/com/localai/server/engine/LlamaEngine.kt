@@ -19,7 +19,7 @@ import com.localai.server.util.FileLog
  * MnnEngine - 基于 MNN LLM 框架的推理引擎
  * 
  * LocalAI-Server v4.0-MNN
- * 使用 MNN 3.4.1 + Qwen3.5-4B-MNN (官方MNN格式)
+ * 使用 MNN 3.4.1 + Qwen3-4B-Instruct-2507-MNN (标准MNN格式，兼容MNN 3.4.1)
  * 
  * 保持与之前 LlamaEngine 接口兼容，底层实现从 llama.cpp 迁移到 MNN
  */
