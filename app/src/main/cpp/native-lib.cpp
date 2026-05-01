@@ -4,6 +4,10 @@
  * 
  * 适配 MNN 3.4.1 + Qwen3.5-4B
  * 基于真实API: https://raw.githubusercontent.com/alibaba/MNN/3.4.1/transformers/llm/engine/include/llm/llm.hpp
+ * 
+ * 修复记录：
+ * - 添加详细的MNN引擎加载步骤LOG
+ * - 在createLLM、set_config、load各步骤添加详细日志
  */
 
 #include <jni.h>
@@ -23,6 +27,7 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 
 // 全局LLM实例 - 使用裸指针（非shared_ptr）
 static MNN::Transformer::Llm* g_llm = nullptr;
@@ -85,7 +90,8 @@ extern "C" {
 JNIEXPORT void JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeInitNative(
         JNIEnv* env, jobject thiz) {
-    LOGI("MNN JNI nativeInitNative called - libraries loaded successfully");
+    LOGI("=== MNN JNI nativeInitNative called ===");
+    LOGI("MNN libraries loaded successfully");
 }
 
 /**
@@ -94,6 +100,8 @@ Java_com_localai_server_engine_LlamaEngine_nativeInitNative(
 JNIEXPORT void JNICALL
 Java_com_localai_server_engine_LlamaEngine_initNativeCallback(
         JNIEnv* env, jobject thiz, jobject callback) {
+    
+    LOGI("Initializing native callback...");
     
     pthread_mutex_lock(&g_callback_mutex);
     
@@ -109,6 +117,11 @@ Java_com_localai_server_engine_LlamaEngine_initNativeCallback(
         jclass callbackClass = env->GetObjectClass(callback);
         if (callbackClass != nullptr) {
             g_token_callback_method = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)V");
+            if (g_token_callback_method != nullptr) {
+                LOGI("Token callback method found");
+            } else {
+                LOGW("Token callback method not found");
+            }
         }
     } else {
         g_callback_object = nullptr;
@@ -117,7 +130,7 @@ Java_com_localai_server_engine_LlamaEngine_initNativeCallback(
     
     pthread_mutex_unlock(&g_callback_mutex);
     
-    LOGI("Native callback initialized");
+    LOGI("Native callback initialized successfully");
 }
 
 /**
@@ -132,48 +145,93 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         jstring config_path, jint n_ctx, jint n_threads) {
     
     const char* config_path_str = env->GetStringUTFChars(config_path, nullptr);
-    LOGI("Loading MNN model from: %s", config_path_str);
+    LOGI("=== Starting MNN model load ===");
+    LOGI("Model path: %s", config_path_str);
+    LOGI("Context size: %d, Threads: %d", n_ctx, n_threads);
     
     // 释放旧模型
     if (g_llm != nullptr) {
+        LOGI("Releasing previous LLM instance");
         MNN::Transformer::Llm::destroy(g_llm);
         g_llm = nullptr;
+        g_is_loaded = false;
     }
     
     try {
-        // 创建LLM实例 - 返回裸指针
+        // ========== 步骤1: 创建LLM实例 ==========
+        LOGI("[STEP 1/3] Creating LLM instance (createLLM)...");
+        long long create_start = android::tickUptimeMs();
+        
         g_llm = MNN::Transformer::Llm::createLLM(config_path_str);
+        
+        long long create_end = android::tickUptimeMs();
+        LOGI("[STEP 1/3] createLLM completed in %lld ms", (create_end - create_start));
+        
         if (g_llm == nullptr) {
-            LOGE("Failed to create LLM instance");
+            LOGE("[STEP 1/3] FAILED: createLLM returned nullptr");
             env->ReleaseStringUTFChars(config_path, config_path_str);
             return JNI_FALSE;
         }
+        LOGI("[STEP 1/3] SUCCESS: LLM instance created");
+        
+        // ========== 步骤2: 设置配置 ==========
+        LOGI("[STEP 2/3] Setting config (set_config)...");
         
         // 设置临时目录和参数 - 使用JSON格式的set_config
         std::string cache_dir = "/data/data/com.localai.server/cache/llm_cache";
+        
+        // 确保缓存目录存在
+        std::string mkdir_cmd = "mkdir -p " + cache_dir;
+        system(mkdir_cmd.c_str());
+        
         std::ostringstream config_json;
         config_json << "{\"tmp_path\":\"" << cache_dir << "\","
                     << "\"threads\":" << n_threads << ","
                     << "\"context_size\":" << n_ctx << "}";
         
-        bool config_success = g_llm->set_config(config_json.str());
-        if (!config_success) {
-            LOGE("Failed to set config");
-            MNN::Transformer::Llm::destroy(g_llm);
-            g_llm = nullptr;
-            env->ReleaseStringUTFChars(config_path, config_path_str);
-            return JNI_FALSE;
-        }
+        std::string config_str = config_json.str();
+        LOGI("[STEP 2/3] Config JSON: %s", config_str.c_str());
         
-        // 加载模型
-        bool load_success = g_llm->load();
-        if (!load_success) {
-            LOGE("Failed to load MNN model");
+        long long setconfig_start = android::tickUptimeMs();
+        bool config_success = g_llm->set_config(config_str);
+        long long setconfig_end = android::tickUptimeMs();
+        
+        LOGI("[STEP 2/3] set_config completed in %lld ms, result: %s", 
+             (setconfig_end - setconfig_start), config_success ? "SUCCESS" : "FAILED");
+        
+        if (!config_success) {
+            LOGE("[STEP 2/3] FAILED: set_config returned false");
             MNN::Transformer::Llm::destroy(g_llm);
             g_llm = nullptr;
             env->ReleaseStringUTFChars(config_path, config_path_str);
             return JNI_FALSE;
         }
+        LOGI("[STEP 2/3] SUCCESS: Config set");
+        
+        // ========== 步骤3: 加载模型 ==========
+        LOGI("[STEP 3/3] Loading model (load)...");
+        LOGI("[STEP 3/3] This may take several minutes for large models...");
+        
+        long long load_start = android::tickUptimeMs();
+        bool load_success = g_llm->load();
+        long long load_end = android::tickUptimeMs();
+        
+        LOGI("[STEP 3/3] load() completed in %lld ms (%lld seconds)", 
+             (load_end - load_start), (load_end - load_start) / 1000);
+        
+        if (!load_success) {
+            LOGE("[STEP 3/3] FAILED: load() returned false");
+            LOGE("[STEP 3/3] Possible causes:");
+            LOGE("  - Model files corrupted or incomplete");
+            LOGE("  - Insufficient disk space for temp files");
+            LOGE("  - Model files not fully downloaded");
+            LOGE("  - Incompatible model version");
+            MNN::Transformer::Llm::destroy(g_llm);
+            g_llm = nullptr;
+            env->ReleaseStringUTFChars(config_path, config_path_str);
+            return JNI_FALSE;
+        }
+        LOGI("[STEP 3/3] SUCCESS: Model loaded");
         
         g_model_path = std::string(config_path_str);
         // 从路径提取模型名
@@ -182,17 +240,41 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
             g_model_path.substr(pos + 1) : g_model_path;
         
         g_is_loaded = true;
-        LOGI("MNN model loaded successfully: %s", g_model_name.c_str());
+        
+        // 计算总耗时
+        long long total_time = load_end - create_start;
+        LOGI("=== MNN model loaded successfully in %lld ms (%lld seconds) ===", 
+             total_time, total_time / 1000);
+        LOGI("Model name: %s", g_model_name.c_str());
         
         env->ReleaseStringUTFChars(config_path, config_path_str);
         return JNI_TRUE;
         
     } catch (const std::exception& e) {
-        LOGE("Exception loading model: %s", e.what());
+        LOGE("=== EXCEPTION during model loading ===");
+        LOGE("Exception type: %s", typeid(e).name());
+        LOGE("Exception message: %s", e.what());
+        LOGE("This likely indicates:");
+        LOGE("  - Corrupted model files");
+        LOGE("  - Memory allocation failure");
+        LOGE("  - MNN library version mismatch");
+        
         if (g_llm != nullptr) {
             MNN::Transformer::Llm::destroy(g_llm);
             g_llm = nullptr;
         }
+        g_is_loaded = false;
+        env->ReleaseStringUTFChars(config_path, config_path_str);
+        return JNI_FALSE;
+    } catch (...) {
+        LOGE("=== UNKNOWN EXCEPTION during model loading ===");
+        LOGE("Unknown exception caught - likely severe error");
+        
+        if (g_llm != nullptr) {
+            MNN::Transformer::Llm::destroy(g_llm);
+            g_llm = nullptr;
+        }
+        g_is_loaded = false;
         env->ReleaseStringUTFChars(config_path, config_path_str);
         return JNI_FALSE;
     }
@@ -205,7 +287,7 @@ JNIEXPORT void JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeUnloadModel(
         JNIEnv* env, jobject thiz) {
     
-    LOGI("Unloading MNN model");
+    LOGI("Unloading MNN model: %s", g_model_name.c_str());
     
     if (g_llm != nullptr) {
         MNN::Transformer::Llm::destroy(g_llm);
@@ -215,6 +297,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeUnloadModel(
     g_model_path.clear();
     g_model_name.clear();
     g_is_loaded = false;
+    LOGI("Model unloaded successfully");
 }
 
 /**
@@ -223,7 +306,9 @@ Java_com_localai_server_engine_LlamaEngine_nativeUnloadModel(
 JNIEXPORT jboolean JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeIsModelLoaded(
         JNIEnv* env, jobject thiz) {
-    return (g_llm != nullptr && g_is_loaded) ? JNI_TRUE : JNI_FALSE;
+    bool loaded = (g_llm != nullptr && g_is_loaded);
+    LOGD("nativeIsModelLoaded: %s", loaded ? "true" : "false");
+    return loaded ? JNI_TRUE : JNI_FALSE;
 }
 
 /**
@@ -236,7 +321,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
         jstring prompt, jint max_tokens, jfloat temperature, jint top_k, jfloat top_p) {
     
     if (g_llm == nullptr || !g_is_loaded) {
-        LOGE("Model not loaded");
+        LOGE("Model not loaded - cannot generate");
         return env->NewStringUTF("");
     }
     
@@ -261,6 +346,8 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
         std::ostringstream oss;
         std::string eos_token = "<|im_end|>";
         
+        LOGD("Starting non-streaming generation...");
+        
         // response()返回void，输出通过ostream
         g_llm->response(history, &oss, eos_token.c_str(), max_tokens);
         
@@ -268,11 +355,11 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
         
         env->ReleaseStringUTFChars(prompt, prompt_str);
         
-        LOGD("Generated: %s", output_stream.c_str());
+        LOGD("Non-streaming generation complete: %zu chars", output_stream.size());
         return env->NewStringUTF(output_stream.c_str());
         
     } catch (const std::exception& e) {
-        LOGE("Exception during generation: %s", e.what());
+        LOGE("Exception during non-streaming generation: %s", e.what());
         env->ReleaseStringUTFChars(prompt, prompt_str);
         return env->NewStringUTF("");
     }
@@ -310,6 +397,8 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
         std::string full_output;
         std::string eos_token = "<|im_end|>";
         
+        LOGD("Starting streaming generation...");
+        
         // 先用response进行prefill阶段（history, nullptr表示不输出到ostream）
         // 这会初始化生成上下文
         g_llm->response(history, nullptr, eos_token.c_str(), max_tokens);
@@ -338,8 +427,9 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
             token_count++;
         }
         
-        env->ReleaseStringUTFChars(prompt, prompt_str);
         LOGD("Streaming complete: %d tokens, %zu chars", token_count, full_output.size());
+        
+        env->ReleaseStringUTFChars(prompt, prompt_str);
         return env->NewStringUTF(full_output.c_str());
         
     } catch (const std::exception& e) {
@@ -355,6 +445,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
 JNIEXPORT jstring JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeGetLoadedModelName(
         JNIEnv* env, jobject thiz) {
+    LOGD("Getting loaded model name: %s", g_model_name.c_str());
     return env->NewStringUTF(g_model_name.c_str());
 }
 
@@ -364,8 +455,12 @@ Java_com_localai_server_engine_LlamaEngine_nativeGetLoadedModelName(
 JNIEXPORT jint JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeGetContextSize(
         JNIEnv* env, jobject thiz) {
-    if (g_llm == nullptr) return 0;
+    if (g_llm == nullptr) {
+        LOGW("nativeGetContextSize: model not loaded, returning 0");
+        return 0;
+    }
     // 从配置获取上下文大小，默认返回4096
+    LOGD("nativeGetContextSize: returning 4096");
     return 4096;
 }
 
@@ -375,9 +470,13 @@ Java_com_localai_server_engine_LlamaEngine_nativeGetContextSize(
 JNIEXPORT jlong JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeGetMemoryUsage(
         JNIEnv* env, jobject thiz) {
-    if (g_llm == nullptr) return 0;
+    if (g_llm == nullptr) {
+        LOGW("nativeGetMemoryUsage: model not loaded, returning 0");
+        return 0;
+    }
     // MNN模型大小估算
     // Qwen3.5-4B MNN模型约 2-3GB
+    LOGD("nativeGetMemoryUsage: returning ~2GB estimate");
     return 2L * 1024 * 1024 * 1024;  // 2GB
 }
 
@@ -390,7 +489,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeSetSystemPrompt(
         JNIEnv* env, jobject thiz, jstring system_prompt) {
     
     if (g_llm == nullptr) {
-        LOGE("Model not loaded");
+        LOGE("Model not loaded - cannot set system prompt");
         return JNI_FALSE;
     }
     
@@ -419,6 +518,8 @@ Java_com_localai_server_engine_LlamaEngine_nativeResetConversation(
     if (g_llm != nullptr) {
         g_llm->reset();
         LOGI("Conversation history reset");
+    } else {
+        LOGW("nativeResetConversation: model not loaded, nothing to reset");
     }
 }
 
@@ -428,6 +529,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeResetConversation(
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     g_jvm = vm;
     LOGI("JNI_OnLoad: JNI version 1.6 loaded");
+    LOGI("MNN LLM JNI Bridge initialized");
     return JNI_VERSION_1_6;
 }
 

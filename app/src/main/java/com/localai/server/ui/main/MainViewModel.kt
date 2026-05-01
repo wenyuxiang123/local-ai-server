@@ -93,7 +93,7 @@ class MainViewModel @Inject constructor(
                         
                         state.copy(
                             loadingPhase = phase,
-                            progress = progress.percent,
+                            progress = if (progress.percent < 0) state.progress else progress.percent,
                             logMessages = newLog,
                             downloadedBytes = progress.downloadedBytes,
                             totalBytes = progress.totalBytes,
@@ -113,18 +113,33 @@ class MainViewModel @Inject constructor(
                     loadAvailableModels()
                     startService()
                 } else {
+                    // 下载完成但模型加载失败（可能是MNN引擎问题）
+                    val missingInfo = if (::modelExtractor.isInitialized) {
+                        "（部分文件可能缺失，请检查日志）"
+                    } else ""
                     _state.update { it.copy(
                         loadingPhase = LoadingPhase.IDLE,
-                        error = "模型加载失败"
+                        error = "模型文件下载完成但MNN引擎加载失败"
                     )}
-                    _effect.emit(MainEffect.ShowError("模型加载失败，请检查网络连接"))
+                    _effect.emit(MainEffect.ShowError("MNN引擎加载失败，请查看日志了解详情"))
                 }
             } catch (e: Exception) {
+                // 根据异常类型区分下载失败和引擎加载失败
+                val errorType = when {
+                    e.message?.contains("磁盘空间", ignoreCase = true) == true -> "磁盘空间不足"
+                    e.message?.contains("网络", ignoreCase = true) == true -> "网络连接失败"
+                    e.message?.contains("超时", ignoreCase = true) == true -> "下载超时"
+                    e.message?.contains("下载", ignoreCase = true) == true -> "下载失败"
+                    e.message?.contains("模型", ignoreCase = true) == true -> "模型加载失败"
+                    else -> "未知错误"
+                }
+                
+                val errorDetail = e.message ?: "未知原因"
                 _state.update { it.copy(
                     loadingPhase = LoadingPhase.IDLE,
-                    error = "模型加载异常: ${e.message}"
+                    error = "$errorType: $errorDetail"
                 )}
-                _effect.emit(MainEffect.ShowError("模型加载异常: ${e.message}"))
+                _effect.emit(MainEffect.ShowError("$errorType: $errorDetail\n\n部分已下载的文件已保留，下次启动将自动断点续传"))
             }
         }
     }

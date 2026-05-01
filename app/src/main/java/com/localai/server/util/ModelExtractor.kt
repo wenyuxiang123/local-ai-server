@@ -2,6 +2,8 @@ package com.localai.server.util
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Environment
+import android.os.StatFs
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -21,6 +24,12 @@ import javax.inject.Singleton
 /**
  * MNN模型提取器
  * 支持从ModelScope/HuggingFace下载MNN模型到目录
+ * 
+ * 修复记录：
+ * - 添加断点续传支持
+ * - 修复catch块过度删除问题
+ * - 添加磁盘空间检查
+ * - 改进错误信息
  */
 @Singleton
 class ModelExtractor @Inject constructor(
@@ -41,7 +50,7 @@ class ModelExtractor @Inject constructor(
         private const val EXPECTED_TOTAL_SIZE = 0L
         
         // MNN模型各文件的已知大小（字节），用于在Content-Length不可用时作为fallback
-        private val KNOWN_FILE_SIZES = mapOf(
+        val KNOWN_FILE_SIZES = mapOf(
             "config.json" to 652L,
             "llm_config.json" to 5018L,
             "llm.mnn" to 3670016L,                // ~3.5MB
@@ -104,12 +113,37 @@ class ModelExtractor @Inject constructor(
         val dirExists = modelDir.exists() && modelDir.isDirectory
         val configExists = modelFile.exists()
         
-        // 检查所有必需文件是否存在
-        val allFilesExist = MNN_MODEL_FILES.all { fileName ->
-            File(modelDir, fileName).exists()
+        // 检查所有必需文件是否存在，并记录缺失的文件
+        val missingFiles = MNN_MODEL_FILES.filter { fileName ->
+            val file = File(modelDir, fileName)
+            val exists = file.exists()
+            if (!exists) {
+                Log.w(TAG, "Missing file: $fileName")
+                com.localai.server.util.FileLog.log(TAG, "Missing file: $fileName")
+            }
+            !exists
         }
         
-        return versionMatch && dirExists && configExists && allFilesExist
+        if (missingFiles.isNotEmpty()) {
+            Log.w(TAG, "Missing files: ${missingFiles.joinToString()}")
+            com.localai.server.util.FileLog.log(TAG, "Missing files: ${missingFiles.joinToString()}")
+        }
+        
+        return versionMatch && dirExists && configExists && missingFiles.isEmpty()
+    }
+    
+    /**
+     * 检查是否有部分文件已下载（用于断点续传）
+     */
+    private fun getPartiallyDownloadedBytes(): Long {
+        var downloadedBytes = 0L
+        for (fileName in MNN_MODEL_FILES) {
+            val file = File(modelDir, fileName)
+            if (file.exists() && file.length() > 0) {
+                downloadedBytes += file.length()
+            }
+        }
+        return downloadedBytes
     }
     
     /**
@@ -139,15 +173,53 @@ class ModelExtractor @Inject constructor(
     fun getDownloadUrl(): String = MODEL_DOWNLOAD_URL
     
     /**
+     * 检查并获取可用磁盘空间（字节）
+     */
+    private fun getAvailableDiskSpace(): Long {
+        return try {
+            val stat = StatFs(context.filesDir.path)
+            stat.availableBlocksLong * stat.blockSizeLong
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get disk space", e)
+            0L
+        }
+    }
+    
+    /**
+     * 检查磁盘空间是否足够
+     * @param requiredBytes 需要的空间（字节）
+     * @return true if sufficient space available
+     */
+    private fun hasEnoughDiskSpace(requiredBytes: Long): Boolean {
+        val available = getAvailableDiskSpace()
+        // 预留500MB作为缓冲
+        val buffer = 500L * 1024 * 1024
+        val sufficient = available >= (requiredBytes + buffer)
+        
+        if (!sufficient) {
+            val availableMB = available / (1024 * 1024)
+            val requiredMB = (requiredBytes + buffer) / (1024 * 1024)
+            Log.e(TAG, "Insufficient disk space: ${availableMB}MB available, ${requiredMB}MB required")
+            com.localai.server.util.FileLog.log(TAG, "DISK_SPACE_ERROR: ${availableMB}MB available, ${requiredMB}MB required")
+        }
+        
+        return sufficient
+    }
+    
+    /**
      * 下载/解压MNN模型
      * 从URL下载多文件到 modelsDir/MNN_MODEL_DIR/
      * 包含三个阶段：下载、等待加载、加载中
      * 支持多URL自动fallback
+     * 支持断点续传
      */
     fun extractModel(): Flow<ExtractProgress> = flow {
+        FileLog.log(TAG, "=== Starting model extraction ===")
+        
         // 检查模型是否已完整下载
         if (isModelExtracted()) {
             Log.i(TAG, "MNN model already extracted: ${modelDir.absolutePath}")
+            FileLog.log(TAG, "Model already extracted, skipping download")
             emit(ExtractProgress(100, "模型已就绪"))
             return@flow
         }
@@ -158,22 +230,39 @@ class ModelExtractor @Inject constructor(
         // 阶段1：下载（支持多URL fallback）
         emit(ExtractProgress(0, "准备下载MNN模型..."))
         
+        // 检查磁盘空间
+        val partiallyDownloaded = getPartiallyDownloadedBytes()
+        val remainingBytes = TOTAL_MODEL_SIZE - partiallyDownloaded
+        
+        FileLog.log(TAG, "Partial download detected: ${partiallyDownloaded}/${TOTAL_MODEL_SIZE} bytes already downloaded")
+        Log.i(TAG, "Partial download: ${partiallyDownloaded}/${TOTAL_MODEL_SIZE} bytes already downloaded")
+        
+        if (remainingBytes > 0) {
+            if (!hasEnoughDiskSpace(remainingBytes)) {
+                val errorMsg = "磁盘空间不足，无法下载模型。请释放至少 ${(remainingBytes / (1024*1024*1024) + 1).coerceAtLeast(3)}GB 空间后重试。"
+                FileLog.log(TAG, "DOWNLOAD_ABORTED: $errorMsg")
+                throw Exception(errorMsg)
+            }
+        }
+        
         var lastException: Exception? = null
         var downloadedFromUrl: String? = null
         
         for ((index, urlTemplate) in MODEL_DOWNLOAD_URL_TEMPLATES.withIndex()) {
             val sourceName = if (index == 0) "ModelScope" else "HuggingFace"
             Log.i(TAG, "Trying download from $sourceName: $urlTemplate")
-            com.localai.server.util.FileLog.log("ModelExtractor", "Trying download from $sourceName: $urlTemplate")
+            FileLog.log(TAG, "Trying source $index ($sourceName): $urlTemplate")
             emit(ExtractProgress(1, "连接 $sourceName 服务器..."))
             
             try {
-                downloadMNNModelFiles(urlTemplate)
+                downloadMNNModelFiles(urlTemplate, partiallyDownloaded)
                 downloadedFromUrl = urlTemplate
+                FileLog.log(TAG, "Download successful from $sourceName")
                 Log.i(TAG, "Download successful from $sourceName")
                 break
             } catch (e: Exception) {
                 Log.w(TAG, "Download failed from $sourceName: ${e.message}")
+                FileLog.log(TAG, "Download failed from $sourceName: ${e.message}")
                 lastException = e
                 
                 // 如果不是最后一个URL，尝试下一个
@@ -185,10 +274,12 @@ class ModelExtractor @Inject constructor(
         
         // 如果所有URL都失败，抛出异常
         if (downloadedFromUrl == null) {
+            FileLog.log(TAG, "ALL_SOURCES_FAILED: ${lastException?.message ?: "Unknown error"}")
             throw lastException ?: Exception("所有下载源均失败")
         }
         
         // 阶段2：等待MNN初始化
+        FileLog.log(TAG, "Download complete, starting MNN initialization")
         emit(ExtractProgress(98, "下载完成"))
         emit(ExtractProgress(98, "正在初始化 MNN 引擎..."))
         Thread.sleep(500)
@@ -207,12 +298,30 @@ class ModelExtractor @Inject constructor(
             .putString(KEY_MODEL_VERSION, CURRENT_MODEL_VERSION)
             .apply()
         
+        FileLog.log(TAG, "=== Model extraction completed successfully ===")
         Log.i(TAG, "MNN model downloaded successfully: ${modelDir.absolutePath}")
         emit(ExtractProgress(100, "MNN模型准备完成"))
         
     }.catch { e ->
         Log.e(TAG, "Failed to download MNN model", e)
-        // 清理可能的不完整文件和状态
+        FileLog.log(TAG, "EXTRACTION_FAILED: ${e.javaClass.simpleName}: ${e.message}")
+        FileLog.log(TAG, "Not deleting existing files to allow resume - partial download preserved")
+        
+        // 不再删除已下载的文件！保留用于断点续传
+        // 只有明确需要清理时才删除（如用户主动重试）
+        
+        prefs.edit()
+            .putBoolean(KEY_MODEL_EXTRACTED, false)
+            // 不清除VERSION，这样isModelExtracted可以知道是部分下载
+            .apply()
+        emit(ExtractProgress(-1, "下载失败: ${e.message}"))
+    }.flowOn(Dispatchers.IO)
+    
+    /**
+     * 删除已下载的模型文件（用于用户主动重试）
+     */
+    fun deleteModelFiles() {
+        FileLog.log(TAG, "Deleting model files for clean retry")
         if (modelDir.exists()) {
             modelDir.deleteRecursively()
         }
@@ -220,19 +329,33 @@ class ModelExtractor @Inject constructor(
             .putBoolean(KEY_MODEL_EXTRACTED, false)
             .putString(KEY_MODEL_VERSION, "")
             .apply()
-        emit(ExtractProgress(-1, "下载失败: ${e.message}"))
-    }.flowOn(Dispatchers.IO)
+    }
     
     /**
      * 下载MNN模型的所有文件
+     * @param urlTemplate 下载URL模板
+     * @param previousFilesBytes 之前已完成文件的累计大小（用于断点续传进度计算）
      */
-    private suspend fun FlowCollector<ExtractProgress>.downloadMNNModelFiles(urlTemplate: String) {
+    private suspend fun FlowCollector<ExtractProgress>.downloadMNNModelFiles(urlTemplate: String, previousFilesBytes: Long = 0) {
         val totalFiles = MNN_MODEL_FILES.size
         var downloadedFiles = 0
-        var totalDownloadedBytes = 0L  // 已完成文件的累计大小
+        var totalDownloadedBytes = previousFilesBytes  // 保留之前下载的部分
         
         for (fileName in MNN_MODEL_FILES) {
+            val targetFile = File(modelDir, fileName)
             val fileUrl = urlTemplate.replace("{filename}", fileName)
+            
+            // 检查文件是否已完整下载
+            val expectedSize = KNOWN_FILE_SIZES[fileName] ?: 0L
+            if (targetFile.exists() && targetFile.length() >= expectedSize && expectedSize > 0) {
+                FileLog.log(TAG, "File already complete: $fileName (${targetFile.length()} bytes)")
+                Log.i(TAG, "File already complete: $fileName (${targetFile.length()} bytes)")
+                totalDownloadedBytes += targetFile.length()
+                downloadedFiles++
+                continue
+            }
+            
+            FileLog.log(TAG, "Downloading $fileName...")
             Log.i(TAG, "Downloading $fileName...")
             
             val basePercent = (downloadedFiles * 95 / totalFiles)
@@ -245,19 +368,30 @@ class ModelExtractor @Inject constructor(
                 speedBytesPerSec = 0L
             ))
             
-            downloadMNNFile(fileUrl, File(modelDir, fileName), fileName, totalDownloadedBytes).collect { progress ->
+            // 记录当前文件下载前的状态
+            val existingSize = if (targetFile.exists()) targetFile.length() else 0L
+            if (existingSize > 0) {
+                FileLog.log(TAG, "Resuming $fileName from byte $existingSize (target: $expectedSize)")
+                Log.i(TAG, "Resuming $fileName from byte $existingSize")
+            }
+            
+            downloadMNNFile(fileUrl, targetFile, fileName, totalDownloadedBytes).collect { progress ->
                 emit(progress)
             }
             
             // 文件下载完成后累加
             val completedFile = File(modelDir, fileName)
-            totalDownloadedBytes += if (completedFile.exists()) completedFile.length() else (KNOWN_FILE_SIZES[fileName] ?: 0L)
+            val fileSize = if (completedFile.exists()) completedFile.length() else 0L
+            totalDownloadedBytes += fileSize
+            FileLog.log(TAG, "Completed $fileName: $fileSize bytes, total: $totalDownloadedBytes")
             downloadedFiles++
         }
     }
     
     /**
      * 从URL下载单个MNN模型文件
+     * 支持断点续传：如果目标文件存在且不完整，会从断点继续下载
+     * 
      * @param urlString 下载URL
      * @param targetFile 目标文件
      * @param fileName 文件名（用于查找KNOWN_FILE_SIZES）
@@ -268,6 +402,8 @@ class ModelExtractor @Inject constructor(
         var downloaded = 0L
         var startTime = System.currentTimeMillis()
         var lastUpdateTime = startTime
+        var resumingFrom = 0L
+        var supportsRange = false
         
         try {
             // 手动处理重定向
@@ -282,17 +418,31 @@ class ModelExtractor @Inject constructor(
                 connection.readTimeout = 300000 // 5分钟超时
                 connection.requestMethod = "GET"
                 connection.instanceFollowRedirects = false
+                
+                // 检查是否需要断点续传
+                val existingSize = if (targetFile.exists()) targetFile.length() else 0L
+                val expectedSize = KNOWN_FILE_SIZES[fileName] ?: 0L
+                
+                if (existingSize > 0 && existingSize < expectedSize) {
+                    // 添加Range头请求部分内容
+                    resumingFrom = existingSize
+                    connection.setRequestProperty("Range", "bytes=$existingSize-")
+                    FileLog.log(TAG, "Requesting Range: bytes=$existingSize- for $fileName")
+                    Log.i(TAG, "Requesting Range: bytes=$existingSize-")
+                }
+                
                 connection.connect()
                 
                 val responseCode = connection.responseCode
-                com.localai.server.util.FileLog.log("ModelExtractor", "URL: $currentUrl, Response: $responseCode")
+                FileLog.log(TAG, "URL: $currentUrl, Response: $responseCode")
+                Log.i(TAG, "Response: $responseCode")
                 
                 if (responseCode == HttpURLConnection.HTTP_MOVED_PERM || 
                     responseCode == HttpURLConnection.HTTP_MOVED_TEMP || 
                     responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
                     responseCode == 307 || responseCode == 308) {
                     val location = connection.getHeaderField("Location")
-                    com.localai.server.util.FileLog.log("ModelExtractor", "Redirect to: $location")
+                    FileLog.log(TAG, "Redirect to: $location")
                     connection.disconnect()
                     if (location.isNullOrEmpty()) {
                         throw Exception("重定向但未提供Location头")
@@ -302,22 +452,46 @@ class ModelExtractor @Inject constructor(
                     continue
                 }
                 
-                if (responseCode != HttpURLConnection.HTTP_OK) {
+                // 检查是否支持Range请求（206 Partial Content）
+                if (responseCode == 206) {
+                    supportsRange = true
+                    val contentRange = connection.getHeaderField("Content-Range")
+                    FileLog.log(TAG, "Server supports Range: $contentRange")
+                    Log.i(TAG, "Server supports Range: $contentRange")
+                } else if (responseCode == HttpURLConnection.HTTP_OK && existingSize > 0) {
+                    // 服务器不支持Range，重新从头下载
+                    FileLog.log(TAG, "Server doesn't support Range, restarting download from beginning")
+                    Log.w(TAG, "Server doesn't support Range, restarting from beginning")
+                    targetFile.delete()
+                    resumingFrom = 0L
+                    downloaded = 0L
+                }
+                
+                if (responseCode != HttpURLConnection.HTTP_OK && responseCode != 206) {
                     throw Exception("服务器返回错误: $responseCode")
                 }
                 break
             }
             
-            com.localai.server.util.FileLog.log("ModelExtractor", "Final URL: $currentUrl")
+            FileLog.log(TAG, "Final URL: $currentUrl, resuming from: $resumingFrom")
             
             val finalConnection = connection ?: throw Exception("连接失败")
             val contentLength = finalConnection.contentLength.toLong()
             // 用已知文件大小作为fallback
             val fileSize = if (contentLength > 0) contentLength else (KNOWN_FILE_SIZES[fileName] ?: 0L)
-            Log.i(TAG, "Content-Length: $contentLength, file: ${targetFile.name}, fallback size: $fileSize")
+            
+            FileLog.log(TAG, "Content-Length: $contentLength, expected: $fileSize, resuming from: $resumingFrom")
+            Log.i(TAG, "Downloading $fileName: $contentLength bytes, resume from: $resumingFrom")
+            
+            // 以追加模式打开文件（如果是断点续传）
+            val outputStream = if (resumingFrom > 0) {
+                FileOutputStream(targetFile, true)
+            } else {
+                FileOutputStream(targetFile)
+            }
             
             finalConnection.inputStream.use { input ->
-                FileOutputStream(targetFile).use { output ->
+                outputStream.use { output ->
                     val buffer = ByteArray(BUFFER_SIZE)
                     var read: Int
                     
@@ -330,7 +504,7 @@ class ModelExtractor @Inject constructor(
                             lastUpdateTime = currentTime
                             
                             // 全局进度 = 之前文件大小 + 当前文件已下载
-                            val globalDownloaded = previousFilesBytes + downloaded
+                            val globalDownloaded = previousFilesBytes + resumingFrom + downloaded
                             val globalTotal = TOTAL_MODEL_SIZE
                             
                             val percent = if (globalTotal > 0) {
@@ -341,28 +515,46 @@ class ModelExtractor @Inject constructor(
                             
                             val downloadedMB = globalDownloaded / (1024 * 1024)
                             val totalMB = globalTotal / (1024 * 1024)
-                            
-                            val elapsed = (currentTime - startTime) / 1000.0
-                            val speedBytesPerSec = if (elapsed > 0) (downloaded / elapsed).toLong() else 0L
-                            val speedMBps = String.format("%.1f", speedBytesPerSec / (1024.0 * 1024.0))
+                            val speedMBps = if (downloaded > 0) {
+                                val elapsed = (currentTime - startTime) / 1000.0
+                                val speedBytesPerSec = (downloaded / elapsed).toLong()
+                                String.format("%.1f", speedBytesPerSec / (1024.0 * 1024.0))
+                            } else {
+                                "0.0"
+                            }
                             
                             emit(ExtractProgress(
                                 percent = percent.coerceIn(2, 95),
                                 message = "下载 $fileName $percent% | $downloadedMB/$totalMB MB | $speedMBps MB/s",
                                 downloadedBytes = globalDownloaded,
                                 totalBytes = globalTotal,
-                                speedBytesPerSec = speedBytesPerSec
+                                speedBytesPerSec = (downloaded / ((currentTime - startTime) / 1000.0).coerceAtLeast(1.0)).toLong()
                             ))
                         }
                     }
                 }
             }
             
+            FileLog.log(TAG, "Downloaded ${targetFile.name}: ${targetFile.length()} bytes (expected: $fileSize)")
             Log.i(TAG, "Downloaded ${targetFile.name}: ${targetFile.length()} bytes")
             
         } catch (e: Exception) {
+            FileLog.log(TAG, "DOWNLOAD_ERROR: ${e.javaClass.simpleName}: ${e.message}")
             Log.e(TAG, "Failed to download ${targetFile.name}", e)
-            targetFile.delete()
+            // 只删除当前正在下载的不完整文件，不影响其他已下载的文件
+            if (targetFile.exists() && targetFile.length() > resumingFrom) {
+                // 保留已下载的部分，只截断到之前的大小
+                try {
+                    RandomAccessFile(targetFile, "rw").use { raf ->
+                        raf.setLength(resumingFrom)
+                    }
+                    FileLog.log(TAG, "Preserved partial download: $resumingFrom bytes of $fileName")
+                } catch (truncateError: Exception) {
+                    // 截断失败，删除整个文件
+                    targetFile.delete()
+                    FileLog.log(TAG, "Truncate failed, deleted incomplete file: $fileName")
+                }
+            }
             throw e
         } finally {
             connection?.disconnect()
