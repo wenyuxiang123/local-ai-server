@@ -50,17 +50,18 @@ class ModelExtractor @Inject constructor(
         private const val EXPECTED_TOTAL_SIZE = 0L
         
         // MNN模型各文件的已知大小（字节），用于在Content-Length不可用时作为fallback
+        // 文件大小来源：ModelScope API v1/models/MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/repo/files
         val KNOWN_FILE_SIZES = mapOf(
-            "config.json" to 652L,
-            "llm_config.json" to 5018L,
-            "llm.mnn" to 3670016L,                // ~3.5MB
-            "llm.mnn.weight" to 2631925760L,       // ~2.45GB
-            "llm.mnn.json" to 9227469L,            // ~8.8MB
-            "tokenizer.txt" to 2936013L            // ~2.8MB
+            "config.json" to 652L,                    // 实际大小: 652
+            "llm_config.json" to 4902L,                // 实际大小: 4902 (原错误5018)
+            "llm.mnn" to 3669048L,                    // 实际大小: 3669048 (原错误3670016)
+            "llm.mnn.weight" to 2629387626L,          // 实际大小: 2629387626 (原错误2631925760)
+            "llm.mnn.json" to 9212662L,                // 实际大小: 9212662 (原错误9227469)
+            "tokenizer.txt" to 2955203L               // 实际大小: 2955203 (原错误2936013)
         )
         
         // 模型总大小（所有文件之和）
-        private const val TOTAL_MODEL_SIZE = 2638563528L  // ~2.46GB
+        private const val TOTAL_MODEL_SIZE = 2644835295L  // ~2.46GB (所有文件实际大小之和)
         
         // MNN模型目录名
         const val MNN_MODEL_DIR = "Qwen3.5-4B-Claude-Distilled"
@@ -545,6 +546,17 @@ class ModelExtractor @Inject constructor(
             
             FileLog.log(TAG, "Downloaded ${targetFile.name}: ${targetFile.length()} bytes (expected: $fileSize)")
             Log.i(TAG, "Downloaded ${targetFile.name}: ${targetFile.length()} bytes")
+            
+            // 下载完成后校验文件大小
+            val actualSize = targetFile.length()
+            val expectedFileSize = KNOWN_FILE_SIZES[fileName] ?: 0L
+            if (expectedFileSize > 0 && actualSize < expectedFileSize) {
+                FileLog.log(TAG, "DOWNLOAD_INCOMPLETE: $fileName got $actualSize bytes, expected $expectedFileSize")
+                Log.w(TAG, "Download incomplete: $fileName ($actualSize / $expectedFileSize)")
+                // 保留已下载部分以便下次断点续传
+                FileLog.log(TAG, "Keeping partial file for resume: $actualSize bytes")
+                throw Exception("文件下载不完整: $fileName ($actualSize / $expectedFileSize bytes)")
+            }
             
         } catch (e: Exception) {
             FileLog.log(TAG, "DOWNLOAD_ERROR: ${e.javaClass.simpleName}: ${e.message}")
