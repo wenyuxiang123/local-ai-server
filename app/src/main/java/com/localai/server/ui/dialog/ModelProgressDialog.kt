@@ -150,13 +150,17 @@ class ModelProgressDialog(private val context: Context) {
         val speedMB = decimalFormat.format(speedBytesPerSec / (1024.0 * 1024.0))
         currentDialog?.findViewById<TextView>(R.id.tv_speed)?.text = "速度: $speedMB MB/s"
         
-        if (speedBytesPerSec > 0) {
+        // 修复负数剩余时间：确保totalBytes > 0 且 downloadedBytes <= totalBytes
+        if (speedBytesPerSec > 0 && totalBytes > 0 && downloadedBytes <= totalBytes) {
             val remainingBytes = totalBytes - downloadedBytes
             val remainingSec = remainingBytes / speedBytesPerSec
             val remainingMin = remainingSec / 60
             val remainingSecRemain = remainingSec % 60
             currentDialog?.findViewById<TextView>(R.id.tv_remaining)?.text = 
                 "剩余: ${remainingMin}分${remainingSecRemain}秒"
+        } else if (speedBytesPerSec > 0) {
+            // 无法计算剩余时间时，清空显示
+            currentDialog?.findViewById<TextView>(R.id.tv_remaining)?.text = ""
         }
     }
 

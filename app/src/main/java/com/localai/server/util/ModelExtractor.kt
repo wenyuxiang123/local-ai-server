@@ -40,6 +40,19 @@ class ModelExtractor @Inject constructor(
         // MNN模型大小校验 - MNN模型是多文件，单文件不校验总大小
         private const val EXPECTED_TOTAL_SIZE = 0L
         
+        // MNN模型各文件的已知大小（字节），用于在Content-Length不可用时作为fallback
+        private val KNOWN_FILE_SIZES = mapOf(
+            "config.json" to 652L,
+            "llm_config.json" to 5018L,
+            "llm.mnn" to 3670016L,                // ~3.5MB
+            "llm.mnn.weight" to 2631925760L,       // ~2.45GB
+            "llm.mnn.json" to 9227469L,            // ~8.8MB
+            "tokenizer.txt" to 2936013L            // ~2.8MB
+        )
+        
+        // 模型总大小（所有文件之和）
+        private const val TOTAL_MODEL_SIZE = 2638563528L  // ~2.46GB
+        
         // MNN模型目录名
         const val MNN_MODEL_DIR = "Qwen3.5-4B-Claude-Distilled"
         
@@ -216,24 +229,41 @@ class ModelExtractor @Inject constructor(
     private suspend fun FlowCollector<ExtractProgress>.downloadMNNModelFiles(urlTemplate: String) {
         val totalFiles = MNN_MODEL_FILES.size
         var downloadedFiles = 0
+        var totalDownloadedBytes = 0L  // 已完成文件的累计大小
         
         for (fileName in MNN_MODEL_FILES) {
             val fileUrl = urlTemplate.replace("{filename}", fileName)
             Log.i(TAG, "Downloading $fileName...")
+            
+            val basePercent = (downloadedFiles * 95 / totalFiles)
+            
             emit(ExtractProgress(
-                (downloadedFiles * 95 / totalFiles).coerceAtLeast(2),
-                "下载 $fileName..."
+                basePercent.coerceAtLeast(2),
+                "下载 $fileName...",
+                downloadedBytes = totalDownloadedBytes,
+                totalBytes = TOTAL_MODEL_SIZE,
+                speedBytesPerSec = 0L
             ))
             
-            downloadMNNFile(fileUrl, File(modelDir, fileName))
+            downloadMNNFile(fileUrl, File(modelDir, fileName), fileName, totalDownloadedBytes).collect { progress ->
+                emit(progress)
+            }
+            
+            // 文件下载完成后累加
+            val completedFile = File(modelDir, fileName)
+            totalDownloadedBytes += if (completedFile.exists()) completedFile.length() else (KNOWN_FILE_SIZES[fileName] ?: 0L)
             downloadedFiles++
         }
     }
     
     /**
      * 从URL下载单个MNN模型文件
+     * @param urlString 下载URL
+     * @param targetFile 目标文件
+     * @param fileName 文件名（用于查找KNOWN_FILE_SIZES）
+     * @param previousFilesBytes 之前已完成文件的累计大小
      */
-    private suspend fun FlowCollector<ExtractProgress>.downloadMNNFile(urlString: String, targetFile: File) {
+    private fun downloadMNNFile(urlString: String, targetFile: File, fileName: String, previousFilesBytes: Long): Flow<ExtractProgress> = flow {
         var connection: HttpURLConnection? = null
         var downloaded = 0L
         var startTime = System.currentTimeMillis()
@@ -282,8 +312,9 @@ class ModelExtractor @Inject constructor(
             
             val finalConnection = connection ?: throw Exception("连接失败")
             val contentLength = finalConnection.contentLength.toLong()
-            val totalSize = if (contentLength > 0) contentLength else EXPECTED_TOTAL_SIZE
-            Log.i(TAG, "Content-Length: $contentLength, file: ${targetFile.name}")
+            // 用已知文件大小作为fallback
+            val fileSize = if (contentLength > 0) contentLength else (KNOWN_FILE_SIZES[fileName] ?: 0L)
+            Log.i(TAG, "Content-Length: $contentLength, file: ${targetFile.name}, fallback size: $fileSize")
             
             finalConnection.inputStream.use { input ->
                 FileOutputStream(targetFile).use { output ->
@@ -298,28 +329,28 @@ class ModelExtractor @Inject constructor(
                         if (currentTime - lastUpdateTime >= 1000) {
                             lastUpdateTime = currentTime
                             
-                            val percent = if (totalSize > 0) {
-                                (downloaded * 100 / totalSize).toInt()
+                            // 全局进度 = 之前文件大小 + 当前文件已下载
+                            val globalDownloaded = previousFilesBytes + downloaded
+                            val globalTotal = TOTAL_MODEL_SIZE
+                            
+                            val percent = if (globalTotal > 0) {
+                                (globalDownloaded * 95 / globalTotal).toInt()
                             } else {
                                 0
                             }
                             
-                            val downloadedMB = downloaded / (1024 * 1024)
-                            val totalMB = if (totalSize > 0) totalSize / (1024 * 1024) else 0
+                            val downloadedMB = globalDownloaded / (1024 * 1024)
+                            val totalMB = globalTotal / (1024 * 1024)
                             
-                            val speedMBps = String.format("%.1f", downloaded / (1024 * 1024) / ((currentTime - startTime) / 1000.0).coerceAtLeast(1.0))
-                            
-                            val speedBytesPerSec = if (currentTime - startTime > 0) {
-                                (downloaded * 1000 / (currentTime - startTime)).toLong()
-                            } else {
-                                0L
-                            }
+                            val elapsed = (currentTime - startTime) / 1000.0
+                            val speedBytesPerSec = if (elapsed > 0) (downloaded / elapsed).toLong() else 0L
+                            val speedMBps = String.format("%.1f", speedBytesPerSec / (1024.0 * 1024.0))
                             
                             emit(ExtractProgress(
                                 percent = percent.coerceIn(2, 95),
-                                message = "下载 ${targetFile.name} $percent% | $downloadedMB/${if (totalMB > 0) totalMB else "--"} MB | $speedMBps MB/s",
-                                downloadedBytes = downloaded,
-                                totalBytes = totalSize,
+                                message = "下载 $fileName $percent% | $downloadedMB/$totalMB MB | $speedMBps MB/s",
+                                downloadedBytes = globalDownloaded,
+                                totalBytes = globalTotal,
                                 speedBytesPerSec = speedBytesPerSec
                             ))
                         }
@@ -336,7 +367,7 @@ class ModelExtractor @Inject constructor(
         } finally {
             connection?.disconnect()
         }
-    }
+    }.flowOn(Dispatchers.IO)
 }
 
 /**
