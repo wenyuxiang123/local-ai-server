@@ -221,82 +221,111 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         LOGI("[STEP 3/3] Loading model (load)...");
         LOGI("[STEP 3/3] This may take several minutes for large models...");
         
-        // ===== DEBUG: 验证模型文件完整性 =====
-        LOGI("[DEBUG] Verifying model files before load()...");
-        
-        // 从config_path提取模型目录
-        std::string model_dir = std::string(config_path_str);
-        size_t lastSlash = model_dir.find_last_of("/\\");
-        if (lastSlash != std::string::npos) {
-            model_dir = model_dir.substr(0, lastSlash);
-        }
-        // 如果config_path是文件而不是目录
-        std::string config_file_name = std::string(config_path_str);
-        lastSlash = config_file_name.find_last_of("/\\");
-        if (lastSlash != std::string::npos) {
-            std::string leaf = config_file_name.substr(lastSlash + 1);
-            if (leaf.find('.') != std::string::npos) {
-                // config_path是文件，提取目录
-                model_dir = config_file_name.substr(0, lastSlash);
+        // ===== 验证模型文件完整性（结果写入g_last_error供Kotlin读取）=====
+        {
+            std::string debug_info;
+            
+            // 从config_path提取模型目录
+            std::string model_dir = std::string(config_path_str);
+            size_t lastSlash = model_dir.find_last_of("/\\");
+            if (lastSlash != std::string::npos) {
+                model_dir = model_dir.substr(0, lastSlash);
             }
-        }
-        LOGI("[DEBUG] Model directory: %s", model_dir.c_str());
-        
-        // 检查 llm.mnn 文件头
-        std::string llm_mnn_path = model_dir + "/llm.mnn";
-        std::ifstream llm_mnn_file(llm_mnn_path, std::ios::binary);
-        if (llm_mnn_file.is_open()) {
-            char magic[4] = {0};
-            llm_mnn_file.read(magic, 4);
-            LOGI("[DEBUG] llm.mnn magic: 0x%02X 0x%02X 0x%02X 0x%02X (expected: 0x4D 0x4E 0x4E for MNN)",
-                 (unsigned char)magic[0], (unsigned char)magic[1], 
-                 (unsigned char)magic[2], (unsigned char)magic[3]);
-            llm_mnn_file.seekg(0, std::ios::end);
-            long llm_mnn_size = llm_mnn_file.tellg();
-            LOGI("[DEBUG] llm.mnn file size: %ld bytes", llm_mnn_size);
-            llm_mnn_file.close();
-        } else {
-            LOGE("[DEBUG] Cannot open llm.mnn at: %s", llm_mnn_path.c_str());
-        }
-        
-        // 检查 llm.mnn.weight 文件
-        std::string llm_weight_path = model_dir + "/llm.mnn.weight";
-        std::ifstream llm_weight_file(llm_weight_path, std::ios::binary);
-        if (llm_weight_file.is_open()) {
-            llm_weight_file.seekg(0, std::ios::end);
-            long weight_size = llm_weight_file.tellg();
-            LOGI("[DEBUG] llm.mnn.weight file size: %ld bytes (%ld MB)", 
-                 weight_size, weight_size / 1024 / 1024);
-            llm_weight_file.close();
-        } else {
-            LOGE("[DEBUG] Cannot open llm.mnn.weight at: %s", llm_weight_path.c_str());
-        }
-        
-        // 检查 llm.mnn.json 文件
-        std::string llm_json_path = model_dir + "/llm.mnn.json";
-        std::ifstream llm_json_file(llm_json_path, std::ios::binary);
-        if (llm_json_file.is_open()) {
-            llm_json_file.seekg(0, std::ios::end);
-            long json_size = llm_json_file.tellg();
-            LOGI("[DEBUG] llm.mnn.json file size: %ld bytes", json_size);
-            llm_json_file.close();
-        } else {
-            LOGE("[DEBUG] Cannot open llm.mnn.json at: %s", llm_json_path.c_str());
-        }
-        
-        // 列出模型目录中的所有文件
-        LOGI("[DEBUG] Listing all files in model directory:");
-        std::string ls_cmd = "ls -la \"" + model_dir + "\" 2>&1";
-        FILE* ls_fp = popen(ls_cmd.c_str(), "r");
-        if (ls_fp) {
-            char buf[1024];
-            while (fgets(buf, sizeof(buf), ls_fp) != nullptr) {
-                buf[strlen(buf)-1] = '\0'; // 去除换行
-                LOGI("[DEBUG]   %s", buf);
+            std::string config_file_name = std::string(config_path_str);
+            lastSlash = config_file_name.find_last_of("/\\");
+            if (lastSlash != std::string::npos) {
+                std::string leaf = config_file_name.substr(lastSlash + 1);
+                if (leaf.find('.') != std::string::npos) {
+                    model_dir = config_file_name.substr(0, lastSlash);
+                }
             }
-            pclose(ls_fp);
+            debug_info += "model_dir: " + model_dir + "\n";
+            
+            // 检查 llm.mnn 文件头 magic bytes
+            std::string llm_mnn_path = model_dir + "/llm.mnn";
+            std::ifstream llm_mnn_file(llm_mnn_path, std::ios::binary);
+            if (llm_mnn_file.is_open()) {
+                char magic[4] = {0};
+                llm_mnn_file.read(magic, 4);
+                char hex_buf[64];
+                snprintf(hex_buf, sizeof(hex_buf), "0x%02X 0x%02X 0x%02X 0x%02X",
+                         (unsigned char)magic[0], (unsigned char)magic[1],
+                         (unsigned char)magic[2], (unsigned char)magic[3]);
+                debug_info += "llm.mnn magic: " + std::string(hex_buf) + " (expect: 0x4D 0x4E 0x4E)\n";
+                
+                bool magic_ok = (magic[0] == 0x4D && magic[1] == 0x4E && magic[2] == 0x4E);
+                debug_info += std::string("magic_valid: ") + (magic_ok ? "YES" : "NO !!!") + "\n";
+                
+                llm_mnn_file.seekg(0, std::ios::end);
+                long llm_mnn_size = llm_mnn_file.tellg();
+                char size_buf[64];
+                snprintf(size_buf, sizeof(size_buf), "%ld", llm_mnn_size);
+                debug_info += "llm.mnn size: " + std::string(size_buf) + " bytes\n";
+                llm_mnn_file.close();
+            } else {
+                debug_info += "llm.mnn: CANNOT OPEN !!! path=" + llm_mnn_path + "\n";
+            }
+            
+            // 检查 llm.mnn.weight
+            std::string llm_weight_path = model_dir + "/llm.mnn.weight";
+            std::ifstream llm_weight_file(llm_weight_path, std::ios::binary);
+            if (llm_weight_file.is_open()) {
+                llm_weight_file.seekg(0, std::ios::end);
+                long weight_size = llm_weight_file.tellg();
+                char size_buf[64];
+                snprintf(size_buf, sizeof(size_buf), "%ld (%ldMB)", weight_size, weight_size / 1024 / 1024);
+                debug_info += "llm.mnn.weight size: " + std::string(size_buf) + "\n";
+                llm_weight_file.close();
+            } else {
+                debug_info += "llm.mnn.weight: CANNOT OPEN !!!\n";
+            }
+            
+            // 检查 llm.mnn.json
+            std::string llm_json_path = model_dir + "/llm.mnn.json";
+            std::ifstream llm_json_file(llm_json_path, std::ios::binary);
+            if (llm_json_file.is_open()) {
+                llm_json_file.seekg(0, std::ios::end);
+                long json_size = llm_json_file.tellg();
+                char size_buf[64];
+                snprintf(size_buf, sizeof(size_buf), "%ld", json_size);
+                debug_info += "llm.mnn.json size: " + std::string(size_buf) + "\n";
+                llm_json_file.close();
+            } else {
+                debug_info += "llm.mnn.json: CANNOT OPEN !!!\n";
+            }
+            
+            // 读取 llm_config.json 的 system_prompt 和 model_type
+            std::string llm_config_path = model_dir + "/llm_config.json";
+            std::ifstream llm_config_file(llm_config_path);
+            if (llm_config_file.is_open()) {
+                std::string config_content((std::istreambuf_iterator<char>(llm_config_file)),
+                                            std::istreambuf_iterator<char>());
+                llm_config_file.close();
+                // 提取关键信息（前500字符）
+                if (config_content.length() > 500) {
+                    debug_info += "llm_config.json (first 500 chars): " + config_content.substr(0, 500) + "\n";
+                } else {
+                    debug_info += "llm_config.json: " + config_content + "\n";
+                }
+            }
+            
+            // 检查可用内存
+            std::ifstream meminfo("/proc/meminfo");
+            if (meminfo.is_open()) {
+                std::string line;
+                while (std::getline(meminfo, line)) {
+                    if (line.find("MemAvailable:") != std::string::npos || 
+                        line.find("MemTotal:") != std::string::npos) {
+                        debug_info += line + "\n";
+                    }
+                }
+                meminfo.close();
+            }
+            
+            // 将调试信息保存到g_last_error，无论load是否成功
+            g_last_error = debug_info;
+            LOGI("%s", debug_info.c_str());
         }
-        // ===== DEBUG END =====
         
         long long load_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         LOGI("[STEP 3/3] Calling g_llm->load()...");
@@ -307,13 +336,11 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
              (load_end_ms - load_start_ms), (load_end_ms - load_start_ms) / 1000);
         
         if (!load_success) {
-            LOGE("[STEP 3/3] FAILED: load() returned false");
-            g_last_error = "load() returned false - model files may be corrupted, incomplete, or out of memory";
-            LOGE("[STEP 3/3] Possible causes:");
-            LOGE("  - Model files corrupted or incomplete");
-            LOGE("  - Insufficient disk space for temp files");
-            LOGE("  - Model files not fully downloaded");
-            LOGE("  - Incompatible model version");
+            LOGE("[STEP 3/3] FAILED: load() returned false in %lld ms", (load_end_ms - load_start_ms));
+            g_last_error = "LOAD FAILED in " + std::to_string(load_end_ms - load_start_ms) + "ms\n" +
+                           "Possible: corrupted files / MNN version mismatch / OOM\n" +
+                           "--- File Debug Info ---\n" + g_last_error;
+            LOGE("  Full debug info written to g_last_error");
             MNN::Transformer::Llm::destroy(g_llm);
             g_llm = nullptr;
             env->ReleaseStringUTFChars(config_path, config_path_str);

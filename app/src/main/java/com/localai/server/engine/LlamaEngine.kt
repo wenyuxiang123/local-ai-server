@@ -270,13 +270,18 @@ class LlamaEngine @Inject constructor(
                 
                 // 读取最近50行的MNN相关logcat日志
                 try {
-                    val logcatProcess = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "100", "-s", "MnnEngine", "MNN", "MNNJNI"))
+                    val logcatProcess = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "200", "-v", "brief"))
                     val logOutput = logcatProcess.inputStream.bufferedReader().readText()
-                    if (logOutput.isNotBlank()) {
-                        FileLog.log(TAG, "=== Recent MNN Logcat (last 100 lines) ===")
-                        logOutput.lines().takeLast(50).forEach { line ->
+                    val mnnLines = logOutput.lines().filter { 
+                        it.contains("MnnEngine") || it.contains("MNN") || it.contains("mnn") 
+                    }.takeLast(50)
+                    if (mnnLines.isNotEmpty()) {
+                        FileLog.log(TAG, "=== Recent MNN Logcat ===")
+                        mnnLines.forEach { line ->
                             FileLog.log(TAG, line)
                         }
+                    } else {
+                        FileLog.log(TAG, "No MNN-related logcat entries found")
                     }
                 } catch (e: Exception) {
                     FileLog.log(TAG, "Failed to read logcat: ${e.message}")
