@@ -49,18 +49,19 @@ class ModelExtractor @Inject constructor(
             "llm_config.json", 
             "llm.mnn",
             "llm.mnn.weight",
+            "llm.mnn.json",
             "tokenizer.txt"
         )
         
-        // 主下载URL - ModelScope
-        private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main"
+        // 主下载URL - ModelScope (使用API格式)
+        private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/repo?Revision=master&FilePath={filename}"
         
-        // 下载URL列表（按优先级）
-        private val MODEL_DOWNLOAD_URLS = listOf(
-            // 1. ModelScope主源
-            "https://modelscope.cn/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main",
-            // 2. HuggingFace镜像
-            "https://hf-mirror.com/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main"
+        // 下载URL模板列表（按优先级），使用{filename}占位符
+        private val MODEL_DOWNLOAD_URL_TEMPLATES = listOf(
+            // 1. ModelScope主源 - API格式
+            "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/repo?Revision=master&FilePath={filename}",
+            // 2. HuggingFace镜像 - resolve格式
+            "https://hf-mirror.com/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main/{filename}"
         )
     }
     
@@ -142,15 +143,15 @@ class ModelExtractor @Inject constructor(
         var lastException: Exception? = null
         var downloadedFromUrl: String? = null
         
-        for ((index, baseUrl) in MODEL_DOWNLOAD_URLS.withIndex()) {
+        for ((index, urlTemplate) in MODEL_DOWNLOAD_URL_TEMPLATES.withIndex()) {
             val sourceName = if (index == 0) "ModelScope" else "HuggingFace"
-            Log.i(TAG, "Trying download from $sourceName: $baseUrl")
-            com.localai.server.util.FileLog.log("ModelExtractor", "Trying download from $sourceName: $baseUrl")
+            Log.i(TAG, "Trying download from $sourceName: $urlTemplate")
+            com.localai.server.util.FileLog.log("ModelExtractor", "Trying download from $sourceName: $urlTemplate")
             emit(ExtractProgress(1, "连接 $sourceName 服务器..."))
             
             try {
-                downloadMNNModelFiles(baseUrl)
-                downloadedFromUrl = baseUrl
+                downloadMNNModelFiles(urlTemplate)
+                downloadedFromUrl = urlTemplate
                 Log.i(TAG, "Download successful from $sourceName")
                 break
             } catch (e: Exception) {
@@ -158,7 +159,7 @@ class ModelExtractor @Inject constructor(
                 lastException = e
                 
                 // 如果不是最后一个URL，尝试下一个
-                if (index < MODEL_DOWNLOAD_URLS.size - 1) {
+                if (index < MODEL_DOWNLOAD_URL_TEMPLATES.size - 1) {
                     emit(ExtractProgress(1, "$sourceName 下载失败，尝试备选源..."))
                 }
             }
@@ -207,12 +208,12 @@ class ModelExtractor @Inject constructor(
     /**
      * 下载MNN模型的所有文件
      */
-    private suspend fun FlowCollector<ExtractProgress>.downloadMNNModelFiles(baseUrl: String) {
+    private suspend fun FlowCollector<ExtractProgress>.downloadMNNModelFiles(urlTemplate: String) {
         val totalFiles = MNN_MODEL_FILES.size
         var downloadedFiles = 0
         
         for (fileName in MNN_MODEL_FILES) {
-            val fileUrl = "$baseUrl/$fileName"
+            val fileUrl = urlTemplate.replace("{filename}", fileName)
             Log.i(TAG, "Downloading $fileName...")
             emit(ExtractProgress(
                 (downloadedFiles * 95 / totalFiles).coerceAtLeast(2),
