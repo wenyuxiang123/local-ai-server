@@ -36,6 +36,7 @@ static std::string g_model_path;
 static std::string g_model_name;
 static std::string g_temp_dir;
 static bool g_is_loaded = false;
+static std::string g_last_error;
 
 // JNI回调相关
 static JavaVM* g_jvm = nullptr;
@@ -146,6 +147,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         jstring config_path, jint n_ctx, jint n_threads) {
     
     const char* config_path_str = env->GetStringUTFChars(config_path, nullptr);
+    g_last_error.clear();
     LOGI("=== Starting MNN model load ===");
     LOGI("Model path: %s", config_path_str);
     LOGI("Context size: %d, Threads: %d", n_ctx, n_threads);
@@ -171,6 +173,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
         if (g_llm == nullptr) {
             LOGE("[STEP 1/3] FAILED: createLLM returned nullptr");
+            g_last_error = "createLLM returned nullptr - model config may be invalid or MNN version incompatible";
             env->ReleaseStringUTFChars(config_path, config_path_str);
             return JNI_FALSE;
         }
@@ -203,6 +206,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
         if (!config_success) {
             LOGE("[STEP 2/3] FAILED: set_config returned false");
+            g_last_error = "set_config returned false - config JSON format may be wrong";
             MNN::Transformer::Llm::destroy(g_llm);
             g_llm = nullptr;
             env->ReleaseStringUTFChars(config_path, config_path_str);
@@ -223,6 +227,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
         if (!load_success) {
             LOGE("[STEP 3/3] FAILED: load() returned false");
+            g_last_error = "load() returned false - model files may be corrupted, incomplete, or out of memory";
             LOGE("[STEP 3/3] Possible causes:");
             LOGE("  - Model files corrupted or incomplete");
             LOGE("  - Insufficient disk space for temp files");
@@ -256,6 +261,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
     } catch (const std::exception& e) {
         LOGE("=== EXCEPTION during model loading ===");
         LOGE("Exception message: %s", e.what());
+        g_last_error = std::string("Exception: ") + e.what();
         LOGE("This likely indicates:");
         LOGE("  - Corrupted model files");
         LOGE("  - Memory allocation failure");
@@ -271,6 +277,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
     } catch (...) {
         LOGE("=== UNKNOWN EXCEPTION during model loading ===");
         LOGE("Unknown exception caught - likely severe error");
+        g_last_error = "Unknown exception during model loading - likely SIGABRT/SIGSEGV in MNN";
         
         if (g_llm != nullptr) {
             MNN::Transformer::Llm::destroy(g_llm);
@@ -533,6 +540,15 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     LOGI("JNI_OnLoad: JNI version 1.6 loaded");
     LOGI("MNN LLM JNI Bridge initialized");
     return JNI_VERSION_1_6;
+}
+
+/**
+ * 获取最后一次加载错误信息
+ */
+JNIEXPORT jstring JNICALL
+Java_com_localai_server_engine_LlamaEngine_nativeGetLastError(
+        JNIEnv* env, jobject thiz) {
+    return env->NewStringUTF(g_last_error.c_str());
 }
 
 }

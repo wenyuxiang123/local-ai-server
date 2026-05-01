@@ -113,6 +113,7 @@ class LlamaEngine @Inject constructor(
     private external fun nativeGetMemoryUsage(): Long
     private external fun nativeSetSystemPrompt(systemPrompt: String): Boolean
     private external fun nativeResetConversation()
+    private external fun nativeGetLastError(): String
     private external fun initNativeCallback(callback: TokenCallback?)
     
     /**
@@ -214,7 +215,33 @@ class LlamaEngine @Inject constructor(
             
             _state.value = State.Initialized
             
-            val success = nativeLoadModel(actualPath, nCtx, nThreads)
+            
+            // 验证模型文件完整性
+            val modelDir = if (file.isDirectory) file else file.parentFile
+            if (modelDir != null && modelDir.isDirectory) {
+                val requiredFiles = listOf("config.json", "llm_config.json", "llm.mnn", "llm.mnn.weight", "llm.mnn.json", "tokenizer.txt")
+                val knownSizes = mapOf(
+                    "config.json" to 652L,
+                    "llm_config.json" to 5018L,
+                    "llm.mnn" to 3670016L,
+                    "llm.mnn.weight" to 2631925760L,
+                    "llm.mnn.json" to 9227469L,
+                    "tokenizer.txt" to 2936013L
+                )
+                FileLog.log(TAG, "=== Model file verification ===")
+                for (fname in requiredFiles) {
+                    val f = File(modelDir, fname)
+                    val expectedSize = knownSizes[fname] ?: 0L
+                    val status = when {
+                        !f.exists() -> "MISSING"
+                        expectedSize > 0 && f.length() != expectedSize -> "SIZE_MISMATCH (got ${f.length()}, expected $expectedSize)"
+                        else -> "OK (${f.length()} bytes)"
+                    }
+                    FileLog.log(TAG, "  $fname: $status")
+                }
+            }
+            
+                        val success = nativeLoadModel(actualPath, nCtx, nThreads)
             
             if (success) {
                 isModelLoaded = true
@@ -234,7 +261,12 @@ class LlamaEngine @Inject constructor(
                 isModelLoaded = false
                 loadedModelPath = null
                 loadedModelName = null
-                _state.value = State.Error("Failed to load model")
+                val nativeError = try { nativeGetLastError() } catch (_: Exception) { "unknown" }
+                val errMsg = "MNN load failed: $nativeError"
+                FileLog.log(TAG, "=== MODEL LOAD FAILED ===")
+                FileLog.log(TAG, "  Native error: $nativeError")
+                FileLog.log(TAG, "  Path: $actualPath")
+                _state.value = State.Error(errMsg)
                 false
             }
         } catch (e: Exception) {
