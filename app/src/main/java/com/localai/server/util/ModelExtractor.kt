@@ -339,7 +339,9 @@ class ModelExtractor @Inject constructor(
     private suspend fun FlowCollector<ExtractProgress>.downloadMNNModelFiles(urlTemplate: String, previousFilesBytes: Long = 0) {
         val totalFiles = MNN_MODEL_FILES.size
         var downloadedFiles = 0
-        var totalDownloadedBytes = previousFilesBytes  // 保留之前下载的部分
+        // previousFilesBytes是从外部传入的部分下载大小，仅作为进度条起点
+        // totalDownloadedBytes独立计算每个文件的实际大小
+        var totalDownloadedBytes = 0L
         
         for (fileName in MNN_MODEL_FILES) {
             val targetFile = File(modelDir, fileName)
@@ -347,7 +349,7 @@ class ModelExtractor @Inject constructor(
             
             // 检查文件是否已完整下载
             val expectedSize = KNOWN_FILE_SIZES[fileName] ?: 0L
-            if (targetFile.exists() && targetFile.length() >= expectedSize && expectedSize > 0) {
+            if (targetFile.exists() && expectedSize > 0 && targetFile.length() >= expectedSize) {
                 FileLog.log(TAG, "File already complete: $fileName (${targetFile.length()} bytes)")
                 Log.i(TAG, "File already complete: $fileName (${targetFile.length()} bytes)")
                 totalDownloadedBytes += targetFile.length()
@@ -358,24 +360,28 @@ class ModelExtractor @Inject constructor(
             FileLog.log(TAG, "Downloading $fileName...")
             Log.i(TAG, "Downloading $fileName...")
             
-            val basePercent = (downloadedFiles * 95 / totalFiles)
+            // 进度条起点 = 已跳过的完整文件 + 当前已下载部分
+            val progressBase = previousFilesBytes + totalDownloadedBytes
+            val basePercent = if (TOTAL_MODEL_SIZE > 0) (progressBase * 95 / TOTAL_MODEL_SIZE).toInt() else (downloadedFiles * 95 / totalFiles)
             
             emit(ExtractProgress(
                 basePercent.coerceAtLeast(2),
                 "下载 $fileName...",
-                downloadedBytes = totalDownloadedBytes,
+                downloadedBytes = progressBase,
                 totalBytes = TOTAL_MODEL_SIZE,
                 speedBytesPerSec = 0L
             ))
             
             // 记录当前文件下载前的状态
-            val existingSize = if (targetFile.exists()) targetFile.length() else 0L
-            if (existingSize > 0) {
-                FileLog.log(TAG, "Resuming $fileName from byte $existingSize (target: $expectedSize)")
-                Log.i(TAG, "Resuming $fileName from byte $existingSize")
+            val partialSize = if (targetFile.exists()) targetFile.length() else 0L
+            if (partialSize > 0) {
+                FileLog.log(TAG, "Resuming $fileName from byte $partialSize (target: $expectedSize)")
+                Log.i(TAG, "Resuming $fileName from byte $partialSize")
             }
             
-            downloadMNNFile(fileUrl, targetFile, fileName, totalDownloadedBytes).collect { progress ->
+            // 传给downloadMNNFile的全局进度起点 = 已完成的完整文件累计大小
+            // downloadMNNFile内部会加上resumingFrom+downloaded计算实际进度
+            downloadMNNFile(fileUrl, targetFile, fileName, progressBase).collect { progress ->
                 emit(progress)
             }
             
@@ -411,6 +417,15 @@ class ModelExtractor @Inject constructor(
             var redirectCount = 0
             val maxRedirects = 5
             
+            // 计算断点续传的起始位置（在重定向循环外计算，避免重复判断）
+            val existingFileSize = if (targetFile.exists()) targetFile.length() else 0L
+            val expectedFileSize = KNOWN_FILE_SIZES[fileName] ?: 0L
+            if (existingFileSize > 0 && existingFileSize < expectedFileSize) {
+                resumingFrom = existingFileSize
+                FileLog.log(TAG, "Will resume $fileName from byte $existingFileSize (target: $expectedFileSize)")
+                Log.i(TAG, "Will resume $fileName from byte $existingFileSize")
+            }
+            
             while (redirectCount < maxRedirects) {
                 val url = URL(currentUrl)
                 connection = url.openConnection() as HttpURLConnection
@@ -419,16 +434,9 @@ class ModelExtractor @Inject constructor(
                 connection.requestMethod = "GET"
                 connection.instanceFollowRedirects = false
                 
-                // 检查是否需要断点续传
-                val existingSize = if (targetFile.exists()) targetFile.length() else 0L
-                val expectedSize = KNOWN_FILE_SIZES[fileName] ?: 0L
-                
-                if (existingSize > 0 && existingSize < expectedSize) {
-                    // 添加Range头请求部分内容
-                    resumingFrom = existingSize
-                    connection.setRequestProperty("Range", "bytes=$existingSize-")
-                    FileLog.log(TAG, "Requesting Range: bytes=$existingSize- for $fileName")
-                    Log.i(TAG, "Requesting Range: bytes=$existingSize-")
+                // 每次重定向后都需要重新设置Range头
+                if (resumingFrom > 0) {
+                    connection.setRequestProperty("Range", "bytes=$resumingFrom-")
                 }
                 
                 connection.connect()
@@ -458,7 +466,7 @@ class ModelExtractor @Inject constructor(
                     val contentRange = connection.getHeaderField("Content-Range")
                     FileLog.log(TAG, "Server supports Range: $contentRange")
                     Log.i(TAG, "Server supports Range: $contentRange")
-                } else if (responseCode == HttpURLConnection.HTTP_OK && existingSize > 0) {
+                } else if (responseCode == HttpURLConnection.HTTP_OK && resumingFrom > 0) {
                     // 服务器不支持Range，重新从头下载
                     FileLog.log(TAG, "Server doesn't support Range, restarting download from beginning")
                     Log.w(TAG, "Server doesn't support Range, restarting from beginning")
@@ -541,14 +549,14 @@ class ModelExtractor @Inject constructor(
         } catch (e: Exception) {
             FileLog.log(TAG, "DOWNLOAD_ERROR: ${e.javaClass.simpleName}: ${e.message}")
             Log.e(TAG, "Failed to download ${targetFile.name}", e)
-            // 只删除当前正在下载的不完整文件，不影响其他已下载的文件
-            if (targetFile.exists() && targetFile.length() > resumingFrom) {
-                // 保留已下载的部分，只截断到之前的大小
+            // 只保留本次下载之前的部分，截断本次新增的不完整数据
+            val originalSize = resumingFrom  // 下载前的文件大小
+            if (targetFile.exists() && targetFile.length() > originalSize && originalSize >= 0) {
                 try {
                     RandomAccessFile(targetFile, "rw").use { raf ->
-                        raf.setLength(resumingFrom)
+                        raf.setLength(originalSize)
                     }
-                    FileLog.log(TAG, "Preserved partial download: $resumingFrom bytes of $fileName")
+                    FileLog.log(TAG, "Preserved partial download: $originalSize bytes of $fileName")
                 } catch (truncateError: Exception) {
                     // 截断失败，删除整个文件
                     targetFile.delete()

@@ -243,8 +243,9 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
         g_is_loaded = true;
         
-        // 计算总耗时
-        long long total_time = load_end_ms - create_ms;
+        // 计算总耗时（从createLLM开始到load完成）
+        auto total_end = std::chrono::steady_clock::now();
+        long long total_time = std::chrono::duration_cast<std::chrono::milliseconds>(total_end - create_start).count();
         LOGI("=== MNN model loaded successfully in %lld ms (%lld seconds) ===", 
              total_time, total_time / 1000);
         LOGI("Model name: %s", g_model_name.c_str());
