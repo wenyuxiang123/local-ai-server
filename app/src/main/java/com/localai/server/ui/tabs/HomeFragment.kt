@@ -355,9 +355,9 @@ class HomeFragment : Fragment() {
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.DOWNLOAD)
                             modelProgressDialog?.updateDownloadProgress(
                                 state.progress,
-                                state.downloadedBytes,
-                                state.totalBytes,
-                                state.downloadSpeed
+                                0L,
+                                0L,
+                                0L
                             )
                         }
                         LoadingPhase.WAITING -> {

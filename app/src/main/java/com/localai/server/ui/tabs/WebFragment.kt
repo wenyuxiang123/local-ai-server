@@ -288,7 +288,7 @@ class WebFragment : Fragment() {
         selectedModel = model
         lifecycleScope.launch {
             // 直接使用 URL 下载
-            modelDownloadManager.downloadFromCustomUrl(model.name, model.url).fold(
+            modelDownloadManager.downloadModel(model.name).fold(
                 onSuccess = {
                     Toast.makeText(requireContext(), "下载完成: ${model.name}", Toast.LENGTH_SHORT).show()
                 },

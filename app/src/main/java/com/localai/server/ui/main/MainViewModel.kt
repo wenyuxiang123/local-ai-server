@@ -92,10 +92,7 @@ class MainViewModel @Inject constructor(
                     state.copy(
                         loadingPhase = phase,
                         progress = progress.percent,
-                        logMessages = newLog,
-                        downloadedBytes = progress.downloadedBytes,
-                        totalBytes = progress.totalBytes,
-                        downloadSpeed = progress.speedBytesPerSec
+                        logMessages = newLog
                     )
                 }
             }
@@ -323,9 +320,6 @@ data class MainState(
     // 下载专用
     val isDownloading: Boolean = false,
     val downloadProgress: Int = 0,
-    val downloadedBytes: Long = 0,
-    val totalBytes: Long = 0,
-    val downloadSpeed: Long = 0,
     val error: String? = null
 )
 
