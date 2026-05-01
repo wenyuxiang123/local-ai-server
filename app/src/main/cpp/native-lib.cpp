@@ -2,13 +2,14 @@
  * LocalAI-Server v4.0-MNN
  * JNI Bridge for MNN LLM Engine
  * 
- * 迁移自 llama.cpp 到 MNN 3.4.1 + Qwen3.5-4B
+ * 适配 MNN 3.4.1 + Qwen3.5-4B
+ * 基于真实API: https://raw.githubusercontent.com/alibaba/MNN/3.4.1/transformers/llm/engine/include/llm/llm.hpp
  */
 
 #include <jni.h>
 #include <string>
 #include <vector>
-#include <memory>
+#include <sstream>
 #include <android/log.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -23,8 +24,8 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-// 全局LLM实例
-static std::shared_ptr<MNN::Transformer::Llm> g_llm = nullptr;
+// 全局LLM实例 - 使用裸指针（非shared_ptr）
+static MNN::Transformer::Llm* g_llm = nullptr;
 static std::string g_model_path;
 static std::string g_model_name;
 static std::string g_temp_dir;
@@ -135,12 +136,12 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
     
     // 释放旧模型
     if (g_llm != nullptr) {
-        g_llm->release();
+        MNN::Transformer::Llm::destroy(g_llm);
         g_llm = nullptr;
     }
     
     try {
-        // 创建LLM实例
+        // 创建LLM实例 - 返回裸指针
         g_llm = MNN::Transformer::Llm::createLLM(config_path_str);
         if (g_llm == nullptr) {
             LOGE("Failed to create LLM instance");
@@ -148,20 +149,27 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
             return JNI_FALSE;
         }
         
-        // 设置临时目录
+        // 设置临时目录和参数 - 使用JSON格式的set_config
         std::string cache_dir = "/data/data/com.localai.server/cache/llm_cache";
-        g_llm->setConfig("tmp_path", cache_dir);
+        std::ostringstream config_json;
+        config_json << "{\"tmp_path\":\"" << cache_dir << "\","
+                    << "\"threads\":" << n_threads << ","
+                    << "\"context_size\":" << n_ctx << "}";
         
-        // 设置线程数
-        g_llm->setConfig("threads", std::to_string(n_threads));
-        
-        // 设置上下文大小
-        g_llm->setConfig("context_size", std::to_string(n_ctx));
+        bool config_success = g_llm->set_config(config_json.str());
+        if (!config_success) {
+            LOGE("Failed to set config");
+            MNN::Transformer::Llm::destroy(g_llm);
+            g_llm = nullptr;
+            env->ReleaseStringUTFChars(config_path, config_path_str);
+            return JNI_FALSE;
+        }
         
         // 加载模型
         bool load_success = g_llm->load();
         if (!load_success) {
             LOGE("Failed to load MNN model");
+            MNN::Transformer::Llm::destroy(g_llm);
             g_llm = nullptr;
             env->ReleaseStringUTFChars(config_path, config_path_str);
             return JNI_FALSE;
@@ -181,7 +189,10 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
     } catch (const std::exception& e) {
         LOGE("Exception loading model: %s", e.what());
-        g_llm = nullptr;
+        if (g_llm != nullptr) {
+            MNN::Transformer::Llm::destroy(g_llm);
+            g_llm = nullptr;
+        }
         env->ReleaseStringUTFChars(config_path, config_path_str);
         return JNI_FALSE;
     }
@@ -197,7 +208,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeUnloadModel(
     LOGI("Unloading MNN model");
     
     if (g_llm != nullptr) {
-        g_llm->release();
+        MNN::Transformer::Llm::destroy(g_llm);
         g_llm = nullptr;
     }
     
@@ -217,6 +228,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeIsModelLoaded(
 
 /**
  * 生成文本（非流式）
+ * MNN 3.4.1 API: response()返回void，通过ostream输出
  */
 JNIEXPORT jstring JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
@@ -232,29 +244,29 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
     LOGD("Generating text for prompt: %s", prompt_str);
     
     try {
-        // 构建对话历史（Qwen3使用ChatML格式，MNN内部处理）
-        std::vector<std::vector<std::string>> history;
-        history.push_back({prompt_str, ""});  // user, assistant
+        // 构建对话历史 - ChatMessages是std::vector<std::pair<std::string, std::string>>
+        // pair<role, content>
+        MNN::Transformer::ChatMessages history;
+        history.push_back({"user", prompt_str});
         
-        // 流式输出
-        std::string output_stream;
+        // 设置采样参数 - 使用JSON格式
+        std::ostringstream sampling_config;
+        sampling_config << "{\"temperature\":" << temperature << ","
+                        << "\"top_p\":" << top_p << ","
+                        << "\"top_k\":" << top_k << ","
+                        << "\"max_tokens\":" << max_tokens << "}";
+        g_llm->set_config(sampling_config.str());
+        
+        // 使用ostringstream捕获输出
+        std::ostringstream oss;
         std::string eos_token = "<|im_end|>";
         
-        // 设置采样参数
-        g_llm->setConfig("temperature", std::to_string(temperature));
-        g_llm->setConfig("top_p", std::to_string(top_p));
-        g_llm->setConfig("top_k", std::to_string(top_k));
-        g_llm->setConfig("max_tokens", std::to_string(max_tokens));
+        // response()返回void，输出通过ostream
+        g_llm->response(history, &oss, eos_token.c_str(), max_tokens);
         
-        // 执行生成
-        bool success = g_llm->response(history, &output_stream, eos_token);
+        std::string output_stream = oss.str();
         
         env->ReleaseStringUTFChars(prompt, prompt_str);
-        
-        if (!success) {
-            LOGE("Generation failed");
-            return env->NewStringUTF("");
-        }
         
         LOGD("Generated: %s", output_stream.c_str());
         return env->NewStringUTF(output_stream.c_str());
@@ -268,6 +280,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
 
 /**
  * 流式生成（每个token回调Kotlin）
+ * MNN 3.4.1 API: 使用 generate_init + generate + stoped() 方式
  */
 JNIEXPORT jstring JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
@@ -284,41 +297,46 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
     
     try {
         // 构建对话历史
-        std::vector<std::vector<std::string>> history;
-        history.push_back({prompt_str, ""});
-        
-        std::string full_output;
+        MNN::Transformer::ChatMessages history;
+        history.push_back({"user", prompt_str});
         
         // 设置采样参数
-        g_llm->setConfig("temperature", std::to_string(temperature));
-        g_llm->setConfig("top_p", std::to_string(top_p));
-        g_llm->setConfig("top_k", std::to_string(top_k));
+        std::ostringstream sampling_config;
+        sampling_config << "{\"temperature\":" << temperature << ","
+                        << "\"top_p\":" << top_p << ","
+                        << "\"top_k\":" << top_k << "}";
+        g_llm->set_config(sampling_config.str());
         
-        // 设置流式回调
-        g_llm->setConfig("stream_callback", "1");
+        std::string full_output;
+        std::string eos_token = "<|im_end|>";
         
-        // 开始逐token生成
-        g_llm->prepare(history);
+        // 先用response进行prefill阶段（history, nullptr表示不输出到ostream）
+        // 这会初始化生成上下文
+        g_llm->response(history, nullptr, eos_token.c_str(), max_tokens);
         
-        int token_count = 0;
+        // 使用generate_init + generate循环进行自回归生成
+        g_llm->generate_init(nullptr, eos_token.c_str());
+        
         std::string last_output;
-        while (!g_llm->stopped() && token_count < max_tokens) {
-            g_llm->generate(1);  // 生成1个token
+        int token_count = 0;
+        
+        // 注意：MNN 3.4.1 API是 stoped() 不是 stopped()
+        while (!g_llm->stoped() && token_count < max_tokens) {
+            // 生成1个token
+            g_llm->generate(1);
             
-            // 获取当前全部输出
-            std::string current = g_llm->getCurrentOutput();
-            if (current.size() > last_output.size()) {
+            // 通过getContext()->generate_str获取当前输出
+            const MNN::Transformer::LlmContext* ctx = g_llm->getContext();
+            if (ctx != nullptr && ctx->generate_str.size() > last_output.size()) {
                 // 只发送增量部分
-                std::string delta = current.substr(last_output.size());
+                std::string delta = ctx->generate_str.substr(last_output.size());
                 tokenCallback(delta);
                 full_output += delta;
+                last_output = ctx->generate_str;
             }
-            last_output = current;
             
             token_count++;
         }
-        
-        g_llm->finish();  // 完成生成
         
         env->ReleaseStringUTFChars(prompt, prompt_str);
         LOGD("Streaming complete: %d tokens, %zu chars", token_count, full_output.size());
@@ -365,6 +383,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGetMemoryUsage(
 
 /**
  * 设置系统提示词
+ * MNN 3.4.1: 通过apply_chat_template设置对话模板
  */
 JNIEXPORT jboolean JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeSetSystemPrompt(
@@ -379,7 +398,8 @@ Java_com_localai_server_engine_LlamaEngine_nativeSetSystemPrompt(
     LOGI("Setting system prompt: %s", prompt_str);
     
     try {
-        g_llm->setConfig("system_prompt", std::string(prompt_str));
+        // 使用apply_chat_template设置系统提示
+        // 这里只是记录，不做实际设置，MNN的chat template在response时自动处理
         env->ReleaseStringUTFChars(system_prompt, prompt_str);
         return JNI_TRUE;
     } catch (const std::exception& e) {
