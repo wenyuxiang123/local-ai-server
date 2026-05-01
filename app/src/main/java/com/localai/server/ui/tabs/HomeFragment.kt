@@ -349,22 +349,22 @@ class HomeFragment : Fragment() {
                             if (modelProgressDialog == null) {
                                 modelProgressDialog = ModelProgressDialog(requireContext())
                                 // 设置要下载的模型名称
-                                val modelName = modelExtractor.getModelFileName().removeSuffix(".gguf")
+                                val modelName = modelExtractor.getDisplayName()
                                 modelProgressDialog?.setModelName(modelName)
                             }
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.DOWNLOAD)
                             modelProgressDialog?.updateDownloadProgress(
                                 state.progress,
-                                0L,
-                                0L,
-                                0L
+                                state.downloadedBytes,
+                                state.totalBytes,
+                                state.speedBytesPerSec
                             )
                         }
                         LoadingPhase.WAITING -> {
                             if (modelProgressDialog == null) {
                                 modelProgressDialog = ModelProgressDialog(requireContext())
                                 // 设置要下载的模型名称
-                                val modelName = modelExtractor.getModelFileName().removeSuffix(".gguf")
+                                val modelName = modelExtractor.getDisplayName()
                                 modelProgressDialog?.setModelName(modelName)
                             }
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.WAITING)
@@ -374,7 +374,7 @@ class HomeFragment : Fragment() {
                             if (modelProgressDialog == null) {
                                 modelProgressDialog = ModelProgressDialog(requireContext())
                                 // 设置要下载的模型名称
-                                val modelName = modelExtractor.getModelFileName().removeSuffix(".gguf")
+                                val modelName = modelExtractor.getDisplayName()
                                 modelProgressDialog?.setModelName(modelName)
                             }
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.LOADING)

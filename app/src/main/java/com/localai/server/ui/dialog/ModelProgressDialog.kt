@@ -78,6 +78,11 @@ class ModelProgressDialog(private val context: Context) {
                 this@ModelProgressDialog.isShowing = false
             }
             show()
+            // 增大弹窗尺寸，避免文字显示不全
+            window?.setLayout(
+                (context.resources.displayMetrics.widthPixels * 0.85).toInt(),
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            )
             this@ModelProgressDialog.isShowing = true
         }
     }
@@ -139,7 +144,8 @@ class ModelProgressDialog(private val context: Context) {
         
         val downloadedMB = downloadedBytes / (1024 * 1024)
         val totalMB = totalBytes / (1024 * 1024)
-        currentDialog?.findViewById<TextView>(R.id.tv_size)?.text = "$downloadedMB MB / $totalMB MB"
+        val totalMBText = if (totalMB > 0) "$totalMB MB" else "-- MB"
+        currentDialog?.findViewById<TextView>(R.id.tv_size)?.text = "$downloadedMB MB / $totalMBText"
         
         val speedMB = decimalFormat.format(speedBytesPerSec / (1024.0 * 1024.0))
         currentDialog?.findViewById<TextView>(R.id.tv_speed)?.text = "速度: $speedMB MB/s"

@@ -116,6 +116,11 @@ class ModelExtractor @Inject constructor(
     fun getModelFileName(): String = MODEL_FILE_NAME
     
     /**
+     * 获取模型显示名称
+     */
+    fun getDisplayName(): String = MNN_MODEL_DIR
+    
+    /**
      * 获取下载URL
      */
     fun getDownloadUrl(): String = MODEL_DOWNLOAD_URL
@@ -312,7 +317,10 @@ class ModelExtractor @Inject constructor(
                             
                             emit(ExtractProgress(
                                 percent = percent.coerceIn(2, 95),
-                                message = "下载 ${targetFile.name} $percent% | $downloadedMB/${if (totalMB > 0) totalMB else "--"} MB | $speedMBps MB/s"
+                                message = "下载 ${targetFile.name} $percent% | $downloadedMB/${if (totalMB > 0) totalMB else "--"} MB | $speedMBps MB/s",
+                                downloadedBytes = downloaded,
+                                totalBytes = totalSize,
+                                speedBytesPerSec = speedBytesPerSec
                             ))
                         }
                     }
@@ -336,5 +344,8 @@ class ModelExtractor @Inject constructor(
  */
 data class ExtractProgress(
     val percent: Int,
-    val message: String
+    val message: String,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L,
+    val speedBytesPerSec: Long = 0L
 )
