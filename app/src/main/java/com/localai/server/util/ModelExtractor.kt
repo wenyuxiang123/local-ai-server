@@ -42,7 +42,7 @@ class ModelExtractor @Inject constructor(
         private const val KEY_MODEL_VERSION = "model_version"
         
         // MNN模型版本和配置
-        private const val CURRENT_MODEL_VERSION = "4B_Claude_MNN_v1"
+        private const val CURRENT_MODEL_VERSION = "Qwen3.5-4B-MNN_v1"
         private const val MODEL_FILE_NAME = "config.json"  // MNN模型目录以config.json为标识
         private const val BUFFER_SIZE = 8 * 1024 * 1024 // 8MB buffer
         
@@ -50,21 +50,21 @@ class ModelExtractor @Inject constructor(
         private const val EXPECTED_TOTAL_SIZE = 0L
         
         // MNN模型各文件的已知大小（字节），用于在Content-Length不可用时作为fallback
-        // 文件大小来源：ModelScope API v1/models/MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/repo/files
+        // 文件大小来源：ModelScope API v1/models/MNN/Qwen3.5-4B-MNN/repo/files
         val KNOWN_FILE_SIZES = mapOf(
             "config.json" to 652L,                    // 实际大小: 652
-            "llm_config.json" to 4902L,                // 实际大小: 4902 (原错误5018)
-            "llm.mnn" to 3669048L,                    // 实际大小: 3669048 (原错误3670016)
-            "llm.mnn.weight" to 2629387626L,          // 实际大小: 2629387626 (原错误2631925760)
-            "llm.mnn.json" to 9212662L,                // 实际大小: 9212662 (原错误9227469)
-            "tokenizer.txt" to 2955203L               // 实际大小: 2955203 (原错误2936013)
+            "llm_config.json" to 8693L,                // 实际大小: 8693
+            "llm.mnn" to 3651096L,                    // 实际大小: 3651096
+            "llm.mnn.weight" to 2629387626L,          // 实际大小: 2629387626
+            "llm.mnn.json" to 9172204L,                // 实际大小: 9172204
+            "tokenizer.txt" to 6465727L               // 实际大小: 6465727
         )
         
         // 模型总大小（所有文件之和）
-        private const val TOTAL_MODEL_SIZE = 2644835295L  // ~2.46GB (所有文件实际大小之和)
+        private const val TOTAL_MODEL_SIZE = 2648686898L  // ~2.65GB (所有文件实际大小之和)
         
         // MNN模型目录名
-        const val MNN_MODEL_DIR = "Qwen3.5-4B-Claude-Distilled"
+        const val MNN_MODEL_DIR = "Qwen3.5-4B-MNN"
         
         // MNN模型文件列表
         private val MNN_MODEL_FILES = listOf(
@@ -77,14 +77,14 @@ class ModelExtractor @Inject constructor(
         )
         
         // 主下载URL - ModelScope (使用API格式)
-        private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/repo?Revision=master&FilePath={filename}"
+        private const val MODEL_DOWNLOAD_URL = "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath={filename}"
         
         // 下载URL模板列表（按优先级），使用{filename}占位符
         private val MODEL_DOWNLOAD_URL_TEMPLATES = listOf(
             // 1. ModelScope主源 - API格式
-            "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/repo?Revision=master&FilePath={filename}",
+            "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath={filename}",
             // 2. HuggingFace镜像 - resolve格式
-            "https://hf-mirror.com/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/resolve/main/{filename}"
+            "https://hf-mirror.com/taobao-mnn/Qwen3.5-4B-MNN/resolve/main/{filename}"
         )
     }
     

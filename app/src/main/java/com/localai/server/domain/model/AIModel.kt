@@ -52,10 +52,10 @@ data class ModelInfo(
 // MNN预置模型列表
 val AVAILABLE_MODELS = listOf(
     ModelInfo(
-        name = "Qwen3.5-4B-Claude-Distilled",
-        url = "https://modelscope.cn/taobao-mnn/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN",
-        size = "~2.5GB",
-        description = "Claude蒸馏版，支持思考模式，MNN格式，推荐"
+        name = "Qwen3.5-4B-MNN",
+        url = "https://modelscope.cn/api/v1/models/MNN/Qwen3.5-4B-MNN/repo?Revision=master&FilePath={filename}",
+        size = "~2.65GB",
+        description = "MNN官方Qwen3.5-4B，支持思考模式，MNN标准格式（修复magic bytes兼容问题）"
     ),
     ModelInfo(
         name = "Qwen3-1.8B-Claude-Distilled",

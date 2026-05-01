@@ -19,7 +19,7 @@ import com.localai.server.util.FileLog
  * MnnEngine - 基于 MNN LLM 框架的推理引擎
  * 
  * LocalAI-Server v4.0-MNN
- * 使用 MNN 3.4.1 + Qwen3.5-4B-Claude蒸馏版
+ * 使用 MNN 3.4.1 + Qwen3.5-4B-MNN (官方MNN格式)
  * 
  * 保持与之前 LlamaEngine 接口兼容，底层实现从 llama.cpp 迁移到 MNN
  */
@@ -221,13 +221,13 @@ class LlamaEngine @Inject constructor(
             if (modelDir != null && modelDir.isDirectory) {
                 val requiredFiles = listOf("config.json", "llm_config.json", "llm.mnn", "llm.mnn.weight", "llm.mnn.json", "tokenizer.txt")
                 val knownSizes = mapOf(
-                    // 文件大小来源：ModelScope API v1/models/MNN/Qwen3.5-4B-Claude-4.6-Opus-Reasoning-Distilled-MNN/repo/files
+                    // 文件大小来源：ModelScope API v1/models/MNN/Qwen3.5-4B-MNN/repo/files
                     "config.json" to 652L,                    // 实际大小: 652
-                    "llm_config.json" to 4902L,                // 实际大小: 4902 (原错误5018)
-                    "llm.mnn" to 3669048L,                    // 实际大小: 3669048 (原错误3670016)
-                    "llm.mnn.weight" to 2629387626L,          // 实际大小: 2629387626 (原错误2631925760)
-                    "llm.mnn.json" to 9212662L,                // 实际大小: 9212662 (原错误9227469)
-                    "tokenizer.txt" to 2955203L               // 实际大小: 2955203 (原错误2936013)
+                    "llm_config.json" to 8693L,                // 实际大小: 8693
+                    "llm.mnn" to 3651096L,                    // 实际大小: 3651096
+                    "llm.mnn.weight" to 2629387626L,          // 实际大小: 2629387626
+                    "llm.mnn.json" to 9172204L,                // 实际大小: 9172204
+                    "tokenizer.txt" to 6465727L               // 实际大小: 6465727
                 )
                 FileLog.log(TAG, "=== Model file verification ===")
                 for (fname in requiredFiles) {
