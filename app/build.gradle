@@ -129,8 +129,8 @@ dependencies {
     ksp 'androidx.room:room-compiler:2.6.1'
     
     // Hilt Dependency Injection
-    implementation 'com.google.dagger:dagger:2.51.1'
-    kapt 'com.google.dagger:dagger-compiler:2.51.1'
+    implementation 'com.google.dagger:hilt-android:2.51.1'
+    kapt 'com.google.dagger:hilt-android-compiler:2.51.1'
     
     // Retrofit + OkHttp
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
