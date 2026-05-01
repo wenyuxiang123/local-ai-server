@@ -549,13 +549,13 @@ class ModelExtractor @Inject constructor(
             
             // 下载完成后校验文件大小
             val actualSize = targetFile.length()
-            val expectedFileSize = KNOWN_FILE_SIZES[fileName] ?: 0L
-            if (expectedFileSize > 0 && actualSize < expectedFileSize) {
-                FileLog.log(TAG, "DOWNLOAD_INCOMPLETE: $fileName got $actualSize bytes, expected $expectedFileSize")
-                Log.w(TAG, "Download incomplete: $fileName ($actualSize / $expectedFileSize)")
+            val expectedFinalSize = KNOWN_FILE_SIZES[fileName] ?: 0L
+            if (expectedFinalSize > 0 && actualSize < expectedFinalSize) {
+                FileLog.log(TAG, "DOWNLOAD_INCOMPLETE: $fileName got $actualSize bytes, expected $expectedFinalSize")
+                Log.w(TAG, "Download incomplete: $fileName ($actualSize / $expectedFinalSize)")
                 // 保留已下载部分以便下次断点续传
                 FileLog.log(TAG, "Keeping partial file for resume: $actualSize bytes")
-                throw Exception("文件下载不完整: $fileName ($actualSize / $expectedFileSize bytes)")
+                throw Exception("文件下载不完整: $fileName ($actualSize / $expectedFinalSize bytes)")
             }
             
         } catch (e: Exception) {
