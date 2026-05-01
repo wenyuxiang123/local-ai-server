@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ==========================================
 # MNN LLM 框架配置
 # LocalAI-Server v4.0-MNN
+# 适配 MNN 3.5.0
+# 支持新flatbuffers格式 (magic 0x20/0x24)
 # ==========================================
 
 # MNN预编译库路径
@@ -46,3 +48,7 @@ target_link_libraries(localai-jni
 # 编译选项
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+
+# 打印MNN配置信息
+message(STATUS "MNN Library Directory: ${MNN_LIB_DIR}")
+message(STATUS "MNN Include Directory: ${MNN_INCLUDE_DIR}")

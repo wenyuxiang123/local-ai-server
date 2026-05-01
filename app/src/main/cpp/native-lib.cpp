@@ -2,10 +2,13 @@
  * LocalAI-Server v4.0-MNN
  * JNI Bridge for MNN LLM Engine
  * 
- * 适配 MNN 3.4.1 + Qwen3.5-4B
- * 基于真实API: https://raw.githubusercontent.com/alibaba/MNN/3.4.1/transformers/llm/engine/include/llm/llm.hpp
+ * 适配 MNN 3.5.0 + Qwen3.5-4B
+ * 基于真实API: https://raw.githubusercontent.com/alibaba/MNN/master/transformers/llm/engine/include/llm/llm.hpp
+ * 
+ * 支持新flatbuffers格式 (magic 0x20/0x24)
  * 
  * 修复记录：
+ * - 2026-05: 升级到MNN 3.5.0，支持新flatbuffers格式模型
  * - 添加详细的MNN引擎加载步骤LOG
  * - 在createLLM、set_config、load各步骤添加详细日志
  */
@@ -94,6 +97,7 @@ JNIEXPORT void JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeInitNative(
         JNIEnv* env, jobject thiz) {
     LOGI("=== MNN JNI nativeInitNative called ===");
+    LOGI("MNN version: %s", MNN_VERSION);
     LOGI("MNN libraries loaded successfully");
 }
 
@@ -137,6 +141,48 @@ Java_com_localai_server_engine_LlamaEngine_initNativeCallback(
 }
 
 /**
+ * 检查MNN模型文件格式
+ * @return 格式类型: "flatbuffers_legacy" (magic 0x4D/0x4E), "flatbuffers_new" (0x20/0x24), "unknown"
+ */
+static std::string checkModelFormat(const std::string& model_dir) {
+    std::string llm_mnn_path = model_dir + "/llm.mnn";
+    std::ifstream file(llm_mnn_path, std::ios::binary);
+    
+    if (!file.is_open()) {
+        return "file_not_found";
+    }
+    
+    char magic[4] = {0};
+    file.read(magic, 4);
+    file.close();
+    
+    unsigned char m0 = (unsigned char)magic[0];
+    unsigned char m1 = (unsigned char)magic[1];
+    unsigned char m2 = (unsigned char)magic[2];
+    unsigned char m3 = (unsigned char)magic[3];
+    
+    char hex_buf[64];
+    snprintf(hex_buf, sizeof(hex_buf), "0x%02X 0x%02X 0x%02X 0x%02X", m0, m1, m2, m3);
+    LOGI("Model magic bytes: %s", hex_buf);
+    
+    // 新格式: 0x20 或 0x24 开头
+    if (m0 == 0x20 || m0 == 0x24) {
+        LOGI("Detected NEW flatbuffers format (0x%02X) - MNN 3.5.0+", m0);
+        return "flatbuffers_new";
+    }
+    
+    // 旧格式: 0x4D 0x4E 0x4E (MNN)
+    if (m0 == 'M' && m1 == 'N' && m2 == 'N') {
+        LOGI("Detected LEGACY format (MNN magic) - compatible with older MNN");
+        return "flatbuffers_legacy";
+    }
+    
+    // 其他格式
+    LOGW("Unknown model format, magic: %s", hex_buf);
+    return "unknown";
+}
+
+/**
  * 加载模型
  * @param configPath 模型config.json路径（MNN模型是目录）
  * @param nCtx 上下文大小
@@ -150,6 +196,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
     const char* config_path_str = env->GetStringUTFChars(config_path, nullptr);
     g_last_error.clear();
     LOGI("=== Starting MNN model load ===");
+    LOGI("MNN version: %s", MNN_VERSION);
     LOGI("Model path: %s", config_path_str);
     LOGI("Context size: %d, Threads: %d", n_ctx, n_threads);
     
@@ -162,6 +209,20 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
     }
     
     try {
+        // 从config_path提取模型目录
+        std::string model_dir = std::string(config_path_str);
+        size_t lastSlash = model_dir.find_last_of("/\\");
+        if (lastSlash != std::string::npos) {
+            std::string leaf = model_dir.substr(lastSlash + 1);
+            if (leaf.find('.') != std::string::npos) {
+                model_dir = model_dir.substr(0, lastSlash);
+            }
+        }
+        
+        // 检查模型格式
+        std::string format = checkModelFormat(model_dir);
+        LOGI("Model format detected: %s", format.c_str());
+        
         // ========== 步骤1: 创建LLM实例 ==========
         LOGI("[STEP 1/3] Creating LLM instance (createLLM)...");
         auto create_start = std::chrono::steady_clock::now();
@@ -174,7 +235,10 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
         if (g_llm == nullptr) {
             LOGE("[STEP 1/3] FAILED: createLLM returned nullptr");
-            g_last_error = "createLLM returned nullptr - model config may be invalid or MNN version incompatible";
+            g_last_error = "createLLM returned nullptr - model config may be invalid or MNN version incompatible\n";
+            g_last_error += "Model format: " + format + "\n";
+            g_last_error += "MNN version: " + std::string(MNN_VERSION) + "\n";
+            g_last_error += "For new flatbuffers format (0x20/0x24), please use MNN 3.5.0+";
             env->ReleaseStringUTFChars(config_path, config_path_str);
             return JNI_FALSE;
         }
@@ -193,16 +257,16 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         std::ostringstream config_json;
         config_json << "{\"tmp_path\":\"" << cache_dir << "\","
                     << "\"threads\":" << n_threads 
-                    // NOTE: context_size removed - not recognized by MNN config
-                    // NOTE: n_ctx should be set in config.json, not via set_config
                     << "}";
         
         std::string config_str = config_json.str();
         LOGI("[STEP 2/3] Config JSON: %s", config_str.c_str());
         
-        long long setconfig_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        long long setconfig_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         bool config_success = g_llm->set_config(config_str);
-        long long setconfig_end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        long long setconfig_end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         
         LOGI("[STEP 2/3] set_config completed in %lld ms, result: %s", 
              (setconfig_end_ms - setconfig_start_ms), config_success ? "SUCCESS" : "FAILED");
@@ -221,27 +285,15 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         LOGI("[STEP 3/3] Loading model (load)...");
         LOGI("[STEP 3/3] This may take several minutes for large models...");
         
-        // ===== 验证模型文件完整性（结果写入g_last_error供Kotlin读取）=====
+        // 验证模型文件完整性
         {
             std::string debug_info;
+            debug_info += "=== Model Debug Info ===\n";
+            debug_info += "MNN Version: " + std::string(MNN_VERSION) + "\n";
+            debug_info += "Model Format: " + format + "\n";
+            debug_info += "Model Dir: " + model_dir + "\n";
             
-            // 从config_path提取模型目录
-            std::string model_dir = std::string(config_path_str);
-            size_t lastSlash = model_dir.find_last_of("/\\");
-            if (lastSlash != std::string::npos) {
-                model_dir = model_dir.substr(0, lastSlash);
-            }
-            std::string config_file_name = std::string(config_path_str);
-            lastSlash = config_file_name.find_last_of("/\\");
-            if (lastSlash != std::string::npos) {
-                std::string leaf = config_file_name.substr(lastSlash + 1);
-                if (leaf.find('.') != std::string::npos) {
-                    model_dir = config_file_name.substr(0, lastSlash);
-                }
-            }
-            debug_info += "model_dir: " + model_dir + "\n";
-            
-            // 检查 llm.mnn 文件头 magic bytes
+            // 检查 llm.mnn 文件
             std::string llm_mnn_path = model_dir + "/llm.mnn";
             std::ifstream llm_mnn_file(llm_mnn_path, std::ios::binary);
             if (llm_mnn_file.is_open()) {
@@ -251,19 +303,14 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
                 snprintf(hex_buf, sizeof(hex_buf), "0x%02X 0x%02X 0x%02X 0x%02X",
                          (unsigned char)magic[0], (unsigned char)magic[1],
                          (unsigned char)magic[2], (unsigned char)magic[3]);
-                debug_info += "llm.mnn magic: " + std::string(hex_buf) + " (expect: 0x4D 0x4E 0x4E)\n";
-                
-                bool magic_ok = (magic[0] == 0x4D && magic[1] == 0x4E && magic[2] == 0x4E);
-                debug_info += std::string("magic_valid: ") + (magic_ok ? "YES" : "NO !!!") + "\n";
+                debug_info += "llm.mnn magic: " + std::string(hex_buf) + "\n";
                 
                 llm_mnn_file.seekg(0, std::ios::end);
                 long llm_mnn_size = llm_mnn_file.tellg();
-                char size_buf[64];
-                snprintf(size_buf, sizeof(size_buf), "%ld", llm_mnn_size);
-                debug_info += "llm.mnn size: " + std::string(size_buf) + " bytes\n";
+                debug_info += "llm.mnn size: " + std::to_string(llm_mnn_size) + " bytes\n";
                 llm_mnn_file.close();
             } else {
-                debug_info += "llm.mnn: CANNOT OPEN !!! path=" + llm_mnn_path + "\n";
+                debug_info += "llm.mnn: CANNOT OPEN\n";
             }
             
             // 检查 llm.mnn.weight
@@ -272,12 +319,10 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
             if (llm_weight_file.is_open()) {
                 llm_weight_file.seekg(0, std::ios::end);
                 long weight_size = llm_weight_file.tellg();
-                char size_buf[64];
-                snprintf(size_buf, sizeof(size_buf), "%ld (%ldMB)", weight_size, weight_size / 1024 / 1024);
-                debug_info += "llm.mnn.weight size: " + std::string(size_buf) + "\n";
+                debug_info += "llm.mnn.weight size: " + std::to_string(weight_size) + " bytes\n";
                 llm_weight_file.close();
             } else {
-                debug_info += "llm.mnn.weight: CANNOT OPEN !!!\n";
+                debug_info += "llm.mnn.weight: NOT FOUND\n";
             }
             
             // 检查 llm.mnn.json
@@ -286,22 +331,19 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
             if (llm_json_file.is_open()) {
                 llm_json_file.seekg(0, std::ios::end);
                 long json_size = llm_json_file.tellg();
-                char size_buf[64];
-                snprintf(size_buf, sizeof(size_buf), "%ld", json_size);
-                debug_info += "llm.mnn.json size: " + std::string(size_buf) + "\n";
+                debug_info += "llm.mnn.json size: " + std::to_string(json_size) + " bytes\n";
                 llm_json_file.close();
             } else {
-                debug_info += "llm.mnn.json: CANNOT OPEN !!!\n";
+                debug_info += "llm.mnn.json: NOT FOUND\n";
             }
             
-            // 读取 llm_config.json 的 system_prompt 和 model_type
+            // 检查 llm_config.json
             std::string llm_config_path = model_dir + "/llm_config.json";
             std::ifstream llm_config_file(llm_config_path);
             if (llm_config_file.is_open()) {
                 std::string config_content((std::istreambuf_iterator<char>(llm_config_file)),
                                             std::istreambuf_iterator<char>());
                 llm_config_file.close();
-                // 提取关键信息（前500字符）
                 if (config_content.length() > 500) {
                     debug_info += "llm_config.json (first 500 chars): " + config_content.substr(0, 500) + "\n";
                 } else {
@@ -322,15 +364,16 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
                 meminfo.close();
             }
             
-            // 将调试信息保存到g_last_error，无论load是否成功
             g_last_error = debug_info;
             LOGI("%s", debug_info.c_str());
         }
         
-        long long load_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        long long load_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         LOGI("[STEP 3/3] Calling g_llm->load()...");
         bool load_success = g_llm->load();
-        long long load_end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        long long load_end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         
         LOGI("[STEP 3/3] load() completed in %lld ms (%lld seconds)", 
              (load_end_ms - load_start_ms), (load_end_ms - load_start_ms) / 1000);
@@ -356,12 +399,13 @@ Java_com_localai_server_engine_LlamaEngine_nativeLoadModel(
         
         g_is_loaded = true;
         
-        // 计算总耗时（从createLLM开始到load完成）
+        // 计算总耗时
         auto total_end = std::chrono::steady_clock::now();
         long long total_time = std::chrono::duration_cast<std::chrono::milliseconds>(total_end - create_start).count();
         LOGI("=== MNN model loaded successfully in %lld ms (%lld seconds) ===", 
              total_time, total_time / 1000);
         LOGI("Model name: %s", g_model_name.c_str());
+        LOGI("Model format: %s", format.c_str());
         
         env->ReleaseStringUTFChars(config_path, config_path_str);
         return JNI_TRUE;
@@ -430,7 +474,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeIsModelLoaded(
 
 /**
  * 生成文本（非流式）
- * MNN 3.4.1 API: response()返回void，通过ostream输出
+ * MNN 3.5.0 API: response()返回void，通过ostream输出
  */
 JNIEXPORT jstring JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
@@ -484,7 +528,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerate(
 
 /**
  * 流式生成（每个token回调Kotlin）
- * MNN 3.4.1 API: 使用 generate_init + generate + stoped() 方式
+ * MNN 3.5.0 API: 使用 generate_init + generate + stoped() 方式
  */
 JNIEXPORT jstring JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
@@ -516,8 +560,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
         
         LOGD("Starting streaming generation...");
         
-        // 先用response进行prefill阶段（history, nullptr表示不输出到ostream）
-        // 这会初始化生成上下文
+        // 先用response进行prefill阶段
         g_llm->response(history, nullptr, eos_token.c_str(), max_tokens);
         
         // 使用generate_init + generate循环进行自回归生成
@@ -526,7 +569,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGenerateStream(
         std::string last_output;
         int token_count = 0;
         
-        // 注意：MNN 3.4.1 API是 stoped() 不是 stopped()
+        // MNN 3.5.0 API: stoped() 不是 stopped()
         while (!g_llm->stoped() && token_count < max_tokens) {
             // 生成1个token
             g_llm->generate(1);
@@ -599,7 +642,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeGetMemoryUsage(
 
 /**
  * 设置系统提示词
- * MNN 3.4.1: 通过apply_chat_template设置对话模板
+ * MNN 3.5.0: 通过apply_chat_template设置对话模板
  */
 JNIEXPORT jboolean JNICALL
 Java_com_localai_server_engine_LlamaEngine_nativeSetSystemPrompt(
@@ -615,7 +658,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeSetSystemPrompt(
     
     try {
         // 使用apply_chat_template设置系统提示
-        // 这里只是记录，不做实际设置，MNN的chat template在response时自动处理
+        // MNN的chat template在response时自动处理
         env->ReleaseStringUTFChars(system_prompt, prompt_str);
         return JNI_TRUE;
     } catch (const std::exception& e) {
@@ -646,7 +689,7 @@ Java_com_localai_server_engine_LlamaEngine_nativeResetConversation(
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
     g_jvm = vm;
     LOGI("JNI_OnLoad: JNI version 1.6 loaded");
-    LOGI("MNN LLM JNI Bridge initialized");
+    LOGI("MNN LLM JNI Bridge initialized (v3.5.0)");
     return JNI_VERSION_1_6;
 }
 
