@@ -38,8 +38,8 @@ jobs:
     
     - name: Clone MNN
       run: |
-        git clone --depth 1 --branch 3.4.1 https://github.com/alibaba/MNN.git ${GITHUB_WORKSPACE}/mnn-src
-        echo "MNN cloned at version 3.4.1"
+        git clone --depth 1 --branch 3.5.0 https://github.com/alibaba/MNN.git ${GITHUB_WORKSPACE}/mnn-src
+        echo "MNN cloned at version 3.5.0"
         ls -la ${GITHUB_WORKSPACE}/mnn-src | head -15
     
     - name: Build MNN Libraries
