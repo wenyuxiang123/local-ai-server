@@ -177,6 +177,13 @@ class ModelProgressDialog(private val context: Context) {
                 it.text = "$currentText\n> $logMessage"
             }
         }
+        
+        // 进度到100%时延迟500ms自动关闭弹窗
+        if (percent >= 100) {
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                dismiss()
+            }, 500)
+        }
     }
 
     /**

@@ -73,49 +73,58 @@ class MainViewModel @Inject constructor(
                 )
             }
             
-            repository.extractBuiltInModel().collect { progress ->
-                // 根据进度百分比判断阶段
-                val phase = when {
-                    progress.percent < 98 -> LoadingPhase.DOWNLOADING
-                    progress.percent == 98 -> LoadingPhase.WAITING
-                    progress.percent >= 99 -> LoadingPhase.LOADING
-                    else -> LoadingPhase.WAITING
+            try {
+                repository.extractBuiltInModel().collect { progress ->
+                    // 根据进度百分比判断阶段，错误情况(<0)也走IDLE
+                    val phase = when {
+                        progress.percent < 0 -> LoadingPhase.IDLE
+                        progress.percent < 98 -> LoadingPhase.DOWNLOADING
+                        progress.percent == 98 -> LoadingPhase.WAITING
+                        progress.percent >= 99 -> LoadingPhase.LOADING
+                        else -> LoadingPhase.WAITING
+                    }
+                    
+                    _state.update { state ->
+                        // 限制日志行数，只保留最近50行
+                        val newLog = (state.logMessages + "\n> " + progress.message)
+                            .split("\n")
+                            .takeLast(50)
+                            .joinToString("\n")
+                        
+                        state.copy(
+                            loadingPhase = phase,
+                            progress = progress.percent,
+                            logMessages = newLog,
+                            downloadedBytes = progress.downloadedBytes,
+                            totalBytes = progress.totalBytes,
+                            speedBytesPerSec = progress.speedBytesPerSec
+                        )
+                    }
                 }
                 
-                _state.update { state ->
-                    // 限制日志行数，只保留最近50行
-                    val newLog = (state.logMessages + "\n> " + progress.message)
-                        .split("\n")
-                        .takeLast(50)
-                        .joinToString("\n")
-                    
-                    state.copy(
-                        loadingPhase = phase,
-                        progress = progress.percent,
-                        logMessages = newLog,
-                        downloadedBytes = progress.downloadedBytes,
-                        totalBytes = progress.totalBytes,
-                        speedBytesPerSec = progress.speedBytesPerSec
-                    )
+                // 检查结果
+                if (repository.isBuiltInModelReady()) {
+                    _state.update { it.copy(
+                        loadingPhase = LoadingPhase.IDLE,
+                        modelReady = true
+                    )}
+                    _effect.emit(MainEffect.ShowToast("模型准备完成"))
+                    _effect.emit(MainEffect.ExtractComplete)
+                    loadAvailableModels()
+                    startService()
+                } else {
+                    _state.update { it.copy(
+                        loadingPhase = LoadingPhase.IDLE,
+                        error = "模型加载失败"
+                    )}
+                    _effect.emit(MainEffect.ShowError("模型加载失败，请检查网络连接"))
                 }
-            }
-            
-            // 检查结果
-            if (repository.isBuiltInModelReady()) {
+            } catch (e: Exception) {
                 _state.update { it.copy(
                     loadingPhase = LoadingPhase.IDLE,
-                    modelReady = true
+                    error = "模型加载异常: ${e.message}"
                 )}
-                _effect.emit(MainEffect.ShowToast("模型准备完成"))
-                _effect.emit(MainEffect.ExtractComplete)
-                loadAvailableModels()
-                startService()
-            } else {
-                _state.update { it.copy(
-                    loadingPhase = LoadingPhase.IDLE,
-                    error = "模型加载失败"
-                )}
-                _effect.emit(MainEffect.ShowError("模型加载失败，请检查网络连接"))
+                _effect.emit(MainEffect.ShowError("模型加载异常: ${e.message}"))
             }
         }
     }

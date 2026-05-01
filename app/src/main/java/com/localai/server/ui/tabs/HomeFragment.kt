@@ -30,6 +30,7 @@ import com.localai.server.ui.main.MainViewModel
 import com.localai.server.util.ModelExtractor
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -379,6 +380,14 @@ class HomeFragment : Fragment() {
                             }
                             modelProgressDialog?.show(ModelProgressDialog.DialogType.LOADING)
                             modelProgressDialog?.updateLoadingProgress(state.progress, state.logMessages)
+                            
+                            // 进度到100%时自动关闭弹窗（防止IDLE状态因StateFlow合并被跳过）
+                            if (state.progress >= 100) {
+                                viewLifecycleOwner.lifecycleScope.launch {
+                                    delay(500)
+                                    modelProgressDialog?.dismiss()
+                                }
+                            }
                         }
                         LoadingPhase.IDLE -> {
                             modelProgressDialog?.dismiss()
