@@ -14,7 +14,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.navigation.NavigationView
 import com.localai.server.databinding.ActivityChatBinding
-import com.localai.server.ui.R
 import com.localai.server.databinding.NavConversationsContentBinding
 import dagger.hilt.android.AndroidEntryPoint
 import android.view.View
@@ -41,9 +40,9 @@ class ChatActivity : AppCompatActivity() {
         // 观察模型生成状态，更新状态栏
         lifecycleScope.launch {
             viewModel.generationPhase.collect { phase ->
-                val statusBar = findViewById<View>(R.id.model_status_bar)
-                val statusText = findViewById<TextView>(R.id.status_text)
-                val progressBar = findViewById<ProgressBar>(R.id.status_progress)
+                val statusBar = binding.modelStatusBar
+                val statusText = binding.statusText
+                val progressBar = binding.statusProgress
 
                 when (phase) {
                     GenerationPhase.Thinking -> {
