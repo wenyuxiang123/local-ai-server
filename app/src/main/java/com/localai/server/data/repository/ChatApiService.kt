@@ -2,14 +2,17 @@ package com.localai.server.data.repository
 
 import android.util.Log
 import com.google.gson.Gson
-import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -35,7 +38,8 @@ data class ChatResponse(
 )
 
 data class Choice(
-    val message: MessageContent?
+    val message: MessageContent?,
+    val delta: DeltaContent?
 )
 
 data class MessageContent(
@@ -43,10 +47,23 @@ data class MessageContent(
     val content: String?
 )
 
+data class DeltaContent(
+    val content: String?
+)
+
 data class ErrorResponse(
     val message: String?,
     val type: String?
 )
+
+/**
+ * 流式输出结果
+ */
+sealed class StreamResult {
+    data class Token(val token: String) : StreamResult()
+    data class Error(val message: String) : StreamResult()
+    object Complete : StreamResult()
+}
 
 @Singleton
 class ChatApiService @Inject constructor() {
@@ -65,6 +82,91 @@ class ChatApiService @Inject constructor() {
     
     private val gson = Gson()
     
+    /**
+     * 流式输出：每生成一个token就回调，实现打字机效果
+     */
+    fun sendMessageStream(
+        baseUrl: String = DEFAULT_BASE_URL,
+        messages: List<ChatMessage>
+    ): Flow<StreamResult> = flow {
+        try {
+            val requestBody = ChatRequest(
+                messages = messages,
+                max_tokens = 2048,
+                temperature = 0.7f,
+                stream = true
+            )
+            
+            val json = gson.toJson(requestBody)
+            Log.d(TAG, "Stream request: ${json.take(200)}")
+            
+            val request = Request.Builder()
+                .url("$baseUrl/v1/chat/completions")
+                .post(json.toRequestBody("application/json".toMediaType()))
+                .build()
+            
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: ""
+                    Log.e(TAG, "Stream error: ${response.code} - ${errorBody.take(200)}")
+                    emit(StreamResult.Error("HTTP ${response.code}: ${response.message}"))
+                    return@use
+                }
+                
+                val inputStream = response.body?.byteStream() ?: run {
+                    emit(StreamResult.Error("空响应"))
+                    return@use
+                }
+                
+                val reader = inputStream.bufferedReader()
+                var line: String?
+                
+                while (reader.readLine().also { line = it } != null) {
+                    val currentLine = line ?: continue
+                    
+                    // SSE格式: data: {...}
+                    if (currentLine.startsWith("data: ")) {
+                        val data = currentLine.substring(6).trim()
+                        
+                        // 流结束标记
+                        if (data == "[DONE]") {
+                            emit(StreamResult.Complete)
+                            break
+                        }
+                        
+                        try {
+                            // 解析JSON
+                            val jsonObj = gson.fromJson(data, JsonObject::class.java)
+                            val choices = jsonObj.getAsJsonArray("choices")
+                            
+                            if (choices != null && choices.size() > 0) {
+                                val choice = choices[0].asJsonObject
+                                val delta = choice.getAsJsonObject("delta")
+                                val content = delta?.get("content")?.asString
+                                
+                                if (!content.isNullOrEmpty()) {
+                                    emit(StreamResult.Token(content))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to parse stream token: ${e.message}")
+                        }
+                    }
+                }
+                
+                reader.close()
+                inputStream.close()
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Stream error: ${e.message}", e)
+            emit(StreamResult.Error(e.message ?: "流式传输错误"))
+        }
+    }.flowOn(Dispatchers.IO)
+    
+    /**
+     * 非流式输出（兼容旧代码）
+     */
     suspend fun sendMessage(
         baseUrl: String = DEFAULT_BASE_URL,
         messages: List<ChatMessage>
@@ -96,7 +198,7 @@ class ChatApiService @Inject constructor() {
                     if (!response.isSuccessful) {
                         // Parse error details from response body
                         val errorDetail = try {
-                            val jsonObj = body?.let { gson.fromJson(it, com.google.gson.JsonObject::class.java) }
+                            val jsonObj = body?.let { gson.fromJson(it, JsonObject::class.java) }
                             jsonObj?.getAsJsonObject("error")?.get("message")?.asString 
                                 ?: response.message
                         } catch (_: Exception) {

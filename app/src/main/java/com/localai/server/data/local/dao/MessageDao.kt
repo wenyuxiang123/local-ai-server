@@ -27,4 +27,8 @@ interface MessageDao {
     
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY createdAt DESC LIMIT 1")
     suspend fun getLastMessage(conversationId: Long): Message?
+    
+    // 更新消息内容（用于流式输出）
+    @Query("UPDATE messages SET content = :content WHERE id = :messageId")
+    suspend fun updateMessageContent(messageId: Long, content: String): Int
 }

@@ -17,4 +17,7 @@ interface ChatRepository {
     suspend fun sendMessage(conversationId: Long, content: String): Long
     suspend fun addAssistantMessage(conversationId: Long, content: String): Long
     suspend fun deleteMessages(conversationId: Long)
+    
+    // 流式输出：更新消息内容（用于边生成边更新）
+    suspend fun updateMessageContent(messageId: Long, content: String)
 }

@@ -1,5 +1,6 @@
 package com.localai.server.ui.chat
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.localai.server.data.local.entity.Conversation
@@ -7,7 +8,9 @@ import com.localai.server.data.local.entity.Message
 import com.localai.server.data.repository.ChatApiService
 import com.localai.server.data.repository.ChatMessage
 import com.localai.server.data.repository.ChatRepository
+import com.localai.server.data.repository.StreamResult
 import com.localai.server.domain.repository.AIRepository
+import com.localai.server.network.WebSearchService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -17,8 +20,11 @@ import javax.inject.Inject
 class ChatViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val chatApiService: ChatApiService,
-    private val aiRepository: AIRepository
+    private val aiRepository: AIRepository,
+    private val webSearchService: WebSearchService
 ) : ViewModel() {
+    
+    private val TAG = "ChatViewModel"
     
     // UI State
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -40,10 +46,16 @@ class ChatViewModel @Inject constructor(
     private val _thinkModeEnabled = MutableStateFlow(false)
     val thinkModeEnabled: StateFlow<Boolean> = _thinkModeEnabled.asStateFlow()
 
-    // Effects for one-time events
-    private val _effect = MutableSharedFlow<ChatEffect>()
+    // 联网搜索开关
+    private val _webSearchEnabled = MutableStateFlow(true)
+    val webSearchEnabled: StateFlow<Boolean> = _webSearchEnabled.asStateFlow()
+
+    // 生成阶段状态：Idle -> Thinking -> Outputting
     private val _generationPhase = MutableStateFlow(GenerationPhase.Idle)
     val generationPhase: StateFlow<GenerationPhase> = _generationPhase
+
+    // Effects for one-time events
+    private val _effect = MutableSharedFlow<ChatEffect>()
     val effect: SharedFlow<ChatEffect> = _effect
     
     init {
@@ -127,6 +139,13 @@ class ChatViewModel @Inject constructor(
     fun setThinkModeEnabled(enabled: Boolean) {
         _thinkModeEnabled.value = enabled
     }
+
+    /**
+     * 切换联网搜索
+     */
+    fun toggleWebSearch() {
+        _webSearchEnabled.value = !_webSearchEnabled.value
+    }
     
     /**
      * Rename conversation
@@ -142,7 +161,8 @@ class ChatViewModel @Inject constructor(
     }
     
     /**
-     * Send user message and get AI response
+     * Send user message and get AI response - 流式输出版本
+     * 实现边思考边输出token，打字机效果
      */
     fun sendMessage(content: String) {
         val conversationId = _currentConversationId.value ?: return
@@ -156,11 +176,12 @@ class ChatViewModel @Inject constructor(
                 
                 // Save user message
                 chatRepository.sendMessage(conversationId, content)
-                
-                // Scroll to bottom
                 _effect.emit(ChatEffect.ScrollToBottom)
                 
-                // Always use 127.0.0.1 for internal chat (WiFi IP can cause connection issues)
+                // 进入思考阶段
+                _generationPhase.value = GenerationPhase.Thinking
+                
+                // Always use 127.0.0.1 for internal chat
                 val baseUrl = "http://127.0.0.1:8080"
                 
                 // Get history messages for context
@@ -168,43 +189,137 @@ class ChatViewModel @Inject constructor(
                     ChatMessage(role = msg.role, content = msg.content)
                 }
                 
-                // Build messages with system prompt
-                val allMessages = chatApiService.buildMessages(content, historyMessages, _thinkModeEnabled.value)
-                
-                // Call AI API
-                chatApiService.sendMessage(baseUrl, allMessages)
-                    .onSuccess { response ->
-                        // Save assistant response
-                        chatRepository.addAssistantMessage(conversationId, response)
+                // ====== 联网搜索逻辑 ======
+                var systemPrompt = "You are a helpful assistant. "
+                if (_webSearchEnabled.value && needWebSearch(content)) {
+                    Log.d(TAG, "触发联网搜索: ${content.take(30)}")
+                    
+                    try {
+                        // 执行联网搜索
+                        val searchResponse = webSearchService.search(content)
+                        val searchResults = searchResponse.results
                         
-                        // Update conversation title if first message
-                        if (_messages.value.size <= 1) {
-                            val title = content.take(20).let { 
-                                if (content.length > 20) "$it..." else it 
+                        if (searchResults.isNotEmpty()) {
+                            // 把搜索结果加入系统提示词
+                            systemPrompt += "\n\n【联网搜索结果】\n"
+                            searchResults.take(3).forEachIndexed { i, result ->
+                                systemPrompt += "${i+1}. ${result.title}\n   ${result.snippet}\n"
                             }
-                            chatRepository.updateConversationTitle(conversationId, title)
+                            systemPrompt += "\n请基于以上搜索结果回答用户问题，确保信息准确。"
+                            Log.d(TAG, "已加入${searchResults.size}条搜索结果到上下文")
                         }
-                        
-                        _uiState.update { it.copy(isLoading = false) }
-                        _effect.emit(ChatEffect.ScrollToBottom)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "联网搜索失败: ${e.message}")
                     }
-                    .onFailure { error ->
-                        val errorMsg = error.message ?: "未知错误"
-                        _uiState.update { it.copy(isLoading = false, error = errorMsg) }
-                        
-                        // Save error as assistant message for visibility
-                        chatRepository.addAssistantMessage(
-                            conversationId, 
-                            "[错误] 无法连接到AI服务: $errorMsg"
-                        )
-                        _effect.emit(ChatEffect.ScrollToBottom)
+                }
+                
+                // 思考模式标签
+                if (_thinkModeEnabled.value) {
+                    systemPrompt += " /think"
+                } else {
+                    systemPrompt += " /no_think"
+                }
+                
+                // Build messages
+                val allMessages = chatApiService.buildMessagesWithSystemPrompt(
+                    userContent = content,
+                    historyMessages = historyMessages,
+                    systemPrompt = systemPrompt
+                )
+                
+                // 进入输出阶段
+                _generationPhase.value = GenerationPhase.Outputting
+                
+                // 创建一个临时的assistant消息，用于流式更新
+                val tempMessageId = chatRepository.addAssistantMessage(conversationId, "")
+                var currentResponse = ""
+                
+                // 调用流式API - 边生成边输出
+                chatApiService.sendMessageStream(baseUrl, allMessages)
+                    .collect { streamResult ->
+                        when (streamResult) {
+                            is StreamResult.Token -> {
+                                // 收到新token，追加到当前响应
+                                currentResponse += streamResult.token
+                                
+                                // 过滤思考内容，移除<think>标签
+                                val displayContent = if (_thinkModeEnabled.value) {
+                                    currentResponse
+                                } else {
+                                    filterThinkContent(currentResponse)
+                                }
+                                
+                                // 实时更新数据库中的消息内容
+                                chatRepository.updateMessageContent(tempMessageId, displayContent)
+                                
+                                // 通知UI滚动到底部
+                                _effect.emit(ChatEffect.ScrollToBottom)
+                            }
+                            
+                            is StreamResult.Error -> {
+                                // 错误处理
+                                val errorMsg = streamResult.message
+                                _uiState.update { it.copy(isLoading = false, error = errorMsg) }
+                                chatRepository.updateMessageContent(
+                                    tempMessageId, 
+                                    "[错误] 无法连接到AI服务: $errorMsg"
+                                )
+                                _effect.emit(ChatEffect.ScrollToBottom)
+                            }
+                            
+                            StreamResult.Complete -> {
+                                // 生成完成
+                                _uiState.update { it.copy(isLoading = false) }
+                                _generationPhase.value = GenerationPhase.Idle
+                                
+                                // 更新会话标题（如果是第一条消息）
+                                if (_messages.value.size <= 1) {
+                                    val title = content.take(20).let { 
+                                        if (content.length > 20) "$it..." else it 
+                                    }
+                                    chatRepository.updateConversationTitle(conversationId, title)
+                                }
+                            }
+                        }
                     }
                 
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message) }
+                _generationPhase.value = GenerationPhase.Idle
                 _effect.emit(ChatEffect.ShowError("发送消息失败: ${e.message}"))
             }
         }
+    }
+    
+    /**
+     * 判断用户问题是否需要联网搜索
+     */
+    private fun needWebSearch(query: String): Boolean {
+        val lowerQuery = query.lowercase()
+        
+        // 搜索触发关键词
+        val searchTriggers = listOf(
+            "搜索", "查一下", "百度", "谷歌", "最新", "今天", "近日", "现在",
+            "股价", "行情", "天气", "新闻", "怎么用", "如何", "是什么",
+            "多少钱", "哪里", "怎么", "为什么", "最近", "查询"
+        )
+        
+        return searchTriggers.any { lowerQuery.contains(it) }
+    }
+    
+    /**
+     * 过滤思考内容，移除 <think> 到 </think> 之间的所有内容
+     */
+    private fun filterThinkContent(raw: String): String {
+        // 正则匹配完整的 <think>...</think> 块（支持跨行）
+        val thinkPattern = Regex("<think>[\\s\\S]*?</think>", RegexOption.DOT_MATCHES_ALL)
+        var result = thinkPattern.replace(raw, "")
+        
+        // 如果有未闭合的 <think> 标签，也移除到行尾
+        val unclosedPattern = Regex("<think>[\\s\\S]*$", RegexOption.DOT_MATCHES_ALL)
+        result = unclosedPattern.replace(result, "")
+        
+        return result.trim()
     }
     
     /**
@@ -249,31 +364,16 @@ data class ChatUiState(
 )
 
 /**
- * One-time effects
+ * 生成阶段
  */
 enum class GenerationPhase {
-    Idle,
-    Thinking,
-    Outputting
+    Idle,        // 空闲
+    Thinking,    // 思考中（联网搜索、模型加载token）
+    Outputting   // 输出中
 }
 
 sealed class ChatEffect {
     data class ShowMessage(val message: String) : ChatEffect()
     data class ShowError(val message: String) : ChatEffect()
     object ScrollToBottom : ChatEffect()
-
-    /**
-     * 过滤思考内容，移除 <think> 到 </think> 之间的所有内容
-     */
-    private fun filterThinkContent(raw: String): String {
-        // 正则匹配完整的 <think>...</think> 块（支持跨行）
-        val thinkPattern = Regex("<think>[\\s\\S]*?</think>", RegexOption.DOT_MATCHES_ALL)
-        var result = thinkPattern.replace(raw, "")
-        
-        // 如果有未闭合的 <think> 标签，也移除到行尾
-        val unclosedPattern = Regex("<think>[\\s\\S]*\$", RegexOption.DOT_MATCHES_ALL)
-        result = unclosedPattern.replace(result, "")
-        
-        return result.trim()
-    }
 }
