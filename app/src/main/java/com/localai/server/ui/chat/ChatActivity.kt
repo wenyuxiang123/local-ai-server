@@ -16,6 +16,9 @@ import com.google.android.material.navigation.NavigationView
 import com.localai.server.databinding.ActivityChatBinding
 import com.localai.server.databinding.NavConversationsContentBinding
 import dagger.hilt.android.AndroidEntryPoint
+import android.view.View
+import android.widget.ProgressBar
+import android.widget.TextView
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -32,7 +35,33 @@ class ChatActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityChatBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        
+
+        // 观察模型生成状态，更新状态栏
+        lifecycleScope.launch {
+            viewModel.generationPhase.collect { phase ->
+                val statusBar = findViewById<View>(R.id.model_status_bar)
+                val statusText = findViewById<TextView>(R.id.status_text)
+                val progressBar = findViewById<ProgressBar>(R.id.status_progress)
+
+                when (phase) {
+                    GenerationPhase.Thinking -> {
+                        statusBar.visibility = View.VISIBLE
+                        statusText.text = "🔄 模型思考中"
+                        progressBar.visibility = View.VISIBLE
+                    }
+                    GenerationPhase.Outputting -> {
+                        statusBar.visibility = View.VISIBLE
+                        statusText.text = "📝 正在输出"
+                        progressBar.visibility = View.VISIBLE
+                    }
+                    GenerationPhase.Idle -> {
+                        statusBar.visibility = View.GONE
+                    }
+                }
+            }
+        }
+
+
         setupDrawer()
         setupViews()
         observeState()
