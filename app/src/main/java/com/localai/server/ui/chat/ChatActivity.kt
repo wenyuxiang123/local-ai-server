@@ -14,6 +14,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.navigation.NavigationView
 import com.localai.server.databinding.ActivityChatBinding
+import com.localai.server.ui.R
 import com.localai.server.databinding.NavConversationsContentBinding
 import dagger.hilt.android.AndroidEntryPoint
 import android.view.View
