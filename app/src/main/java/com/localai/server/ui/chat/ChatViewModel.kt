@@ -261,4 +261,19 @@ sealed class ChatEffect {
     data class ShowMessage(val message: String) : ChatEffect()
     data class ShowError(val message: String) : ChatEffect()
     object ScrollToBottom : ChatEffect()
+
+    /**
+     * 过滤思考内容，移除 <think> 到 </think> 之间的所有内容
+     */
+    private fun filterThinkContent(raw: String): String {
+        // 正则匹配完整的 <think>...</think> 块（支持跨行）
+        val thinkPattern = Regex("<think>[\\s\\S]*?</think>", RegexOption.DOT_MATCHES_ALL)
+        var result = thinkPattern.replace(raw, "")
+        
+        // 如果有未闭合的 <think> 标签，也移除到行尾
+        val unclosedPattern = Regex("<think>[\\s\\S]*\$", RegexOption.DOT_MATCHES_ALL)
+        result = unclosedPattern.replace(result, "")
+        
+        return result.trim()
+    }
 }
