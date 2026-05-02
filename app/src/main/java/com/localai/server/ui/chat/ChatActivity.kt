@@ -20,6 +20,7 @@ import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
 import kotlinx.coroutines.launch
+import com.localai.server.ui.chat.GenerationPhase
 
 @AndroidEntryPoint
 class ChatActivity : AppCompatActivity() {
