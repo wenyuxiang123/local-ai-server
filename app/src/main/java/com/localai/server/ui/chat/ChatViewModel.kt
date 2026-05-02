@@ -42,6 +42,8 @@ class ChatViewModel @Inject constructor(
 
     // Effects for one-time events
     private val _effect = MutableSharedFlow<ChatEffect>()
+    private val _generationPhase = MutableStateFlow(GenerationPhase.Idle)
+    val generationPhase: StateFlow<GenerationPhase> = _generationPhase
     val effect: SharedFlow<ChatEffect> = _effect
     
     init {
@@ -249,6 +251,12 @@ data class ChatUiState(
 /**
  * One-time effects
  */
+enum class GenerationPhase {
+    Idle,
+    Thinking,
+    Outputting
+}
+
 sealed class ChatEffect {
     data class ShowMessage(val message: String) : ChatEffect()
     data class ShowError(val message: String) : ChatEffect()
